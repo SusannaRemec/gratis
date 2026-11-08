@@ -2,7 +2,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import test from'node:test';import assert from'node:assert/strict';import{mkdtemp,rm}from'node:fs/promises';import{resolve}from'node:path';import{ChatService}from'../src/chat-service.mjs';
 async function setup(t,backend){const dataDir=await mkdtemp(join(tmpdir(),'gratis-test-'));t.after(()=>rm(dataDir,{recursive:true,force:true}));const service=new ChatService({dataDir,backend});await service.init();await service.updateBot({id:service.state.activeBotId,instructions:'Complete the user task.'});return service;}
-async function until(check){for(let i=0;i<1000;i++){if(check())return;await new Promise(r=>setImmediate(r));}assert.fail('State did not settle');}
+async function until(check){for(const deadline=Date.now()+5000;Date.now()<deadline;){if(check())return;await new Promise(r=>setTimeout(r,5));}assert.fail('State did not settle');}
 const interrupted=signal=>new Promise((_,reject)=>{if(signal.aborted)reject(signal.reason);else signal.addEventListener('abort',()=>reject(signal.reason),{once:true});});
 function fixture(calls){return async function*(args){calls.push(args);if(calls.length===1){args.onMetadata({activity:{id:'opened',name:'computer',status:'complete',input:{action:'browse_url',args:{url:'https://example.com/start'}}}});yield 'Already checked the first page.';await interrupted(args.signal);}else yield 'Continued from the page you changed.';};}
 test('returning control resumes the same reply once, with partial progress and the current computer state',async t=>{

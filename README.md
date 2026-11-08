@@ -1,5 +1,8 @@
 # Gratis
 
+> **Before installing:** Do your own due diligence. This is experimental software, provided without warranty or a maintenance commitment. Review the source, permissions, third-party services and [installation/use notice](DISCLAIMER.md); back up your data and test with a disposable workspace first.
+
+
 **A desktop home for your AI assistants. Your bots, your context, your connections.**
 
 Gratis brings focused assistants, group conversations, local memory and recurring work into one desktop workspace. Connect an eligible Claude or Codex account, choose which tools a bot can use, and keep its work in one place.
@@ -56,8 +59,8 @@ Microphone transcription needs optional local tools and a model; see the [voice 
 
 This is the reusable MIT-licensed core. It has no membership requirement, community-only runtime dependency, personal chat history, account credentials, or preconfigured hosting account. A separate community workspace can build on this repository with its own documentation, templates and features. The installed personal edition is independent.
 
-## Status and contributions
+## Status
 
 This is a source release, not a signed or notarized installer. Automated checks cover the core runtime; the documented desktop smoke test uses synthetic data. Please report reproducible issues without tokens, private messages or real account traces. See [Contributing](CONTRIBUTING.md) and [Security](SECURITY.md).
 
-Independent software maintained by PromptAdvisers. Provider and integration names identify compatible services; their owners do not sponsor or endorse this project.
+Independent project. No affiliation with or endorsement by GrokBot’s creators, xAI, OpenAI, Anthropic or other referenced services. See [the full notice](DISCLAIMER.md).

@@ -1,5 +1,7 @@
 # Your first five minutes
 
+Before installing, read the [installation and use notice](../DISCLAIMER.md). Review permissions and costs, back up your data, and try a disposable workspace first.
+
 ## 1. Install and launch
 
 Use a Mac with Apple Silicon, Node.js 22+ and npm. Clone the repository and run the four commands in the main README. `npm run setup:assets` downloads a fixed revision of the semantic memory encoder and a fixed Composio CLI release, verifies checksums, and installs them only inside this checkout. It does not copy your account configuration or sign you in.

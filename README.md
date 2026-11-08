@@ -59,6 +59,12 @@ Microphone transcription needs optional local tools and a model; see the [voice 
 
 This is the reusable MIT-licensed core. It has no membership requirement, community-only runtime dependency, personal chat history, account credentials, or preconfigured hosting account. A separate community workspace can build on this repository with its own documentation, templates and features. The installed personal edition is independent.
 
+## License and reuse
+
+This project's own source is released under the standard [MIT license](LICENSE). You may use, modify, redistribute, sublicense and sell copies, including in commercial projects, while retaining the required copyright and license notice. There is no added noncommercial clause, membership requirement or restriction on competing products.
+
+Dependencies keep their own licenses. Provider subscriptions and third-party services have separate terms. [Third-party notices](THIRD_PARTY_NOTICES.md) explain included assets and dependencies. The [installation notice](DISCLAIMER.md) is risk guidance, not an extra source-code license. A repository license does not grant rights to another product's trademarks, private code, artwork or data.
+
 ## Status
 
 This is a source release, not a signed or notarized installer. Automated checks cover the core runtime; the documented desktop smoke test uses synthetic data. Please report reproducible issues without tokens, private messages or real account traces. See [Contributing](CONTRIBUTING.md) and [Security](SECURITY.md).

@@ -18,6 +18,10 @@ Gratis is an independent project. It is not affiliated with, sponsored by, endor
 
 The project's [license](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md) govern the relevant source and dependencies. This notice does not grant permission to copy another product's protected code, artwork or branding, and does not establish that a particular use is legally permitted.
 
+## Source-code permissions
+
+The standard MIT license in [LICENSE](LICENSE) governs this project's own source. This notice does not add a field-of-use, noncommercial, membership or redistribution restriction. Preserve the required license/copyright notices and review the separate licenses of bundled dependencies. The practical recommendations above do not amend those permissions.
+
 ## No warranty or maintenance commitment
 
 The software is provided “as is” and “as available,” without warranties, under the terms of its license and to the extent permitted by applicable law. There is no promise of support, ongoing maintenance, availability, compatibility, security, fitness for a particular purpose, or error-free operation. Installing or using it is at your own risk. Nothing in this notice excludes rights or liabilities that applicable law does not permit to be excluded.

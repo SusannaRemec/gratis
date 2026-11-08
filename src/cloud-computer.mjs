@@ -1,3 +1,4 @@
+import {isBlankComputerFrame} from './computer-preview.mjs';
 import {ComputerLive,liveSocketURL} from './computer-live.mjs';
 import {createHash,randomUUID} from 'node:crypto';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -80,7 +81,7 @@ export class CloudComputer {
     this.seats.add(`${botId}/${conversationId}`);
     if(value.browserObservation)this.observations.set(conversationId,value.browserObservation);
     if(value.visualArtifact?.liveViewUrl){const prior=this.liveLinks.get(conversationId)?.url,next=value.visualArtifact.liveViewUrl;if(prior&&liveSocketURL(prior)?.split('?')[0]!==liveSocketURL(next)?.split('?')[0]){this.live.get(conversationId)?.close();this.live.delete(conversationId);}this.liveLinks.set(conversationId,{url:value.visualArtifact.liveViewUrl,at:Date.now(),botId});if(this.watched?.conversationId===conversationId)void this.connectLive(conversationId);}
-    if(value.visualArtifact){const f=value.visualArtifact;if(f.mimeType!=='image/png'||typeof f.dataBase64!=='string'||f.dataBase64.length>6000000||digest(Buffer.from(f.dataBase64,'base64'))!==f.sha256)throw new Error('The computer returned an invalid screenshot.');const frame={botId,conversationId,dataUrl:`data:image/png;base64,${f.dataBase64}`,url:f.currentUrl,title:f.pageTitle,at:Date.now()};const live=this.live.get(conversationId),previous=this.frames.get(conversationId);if(!live?.ready||!previous){this.frames.set(conversationId,frame);this.onFrame(frame);}else{const metadata={...previous,url:live.url||frame.url,title:frame.title};this.frames.set(conversationId,metadata);this.onFrame(metadata);}}
+    if(value.visualArtifact){const f=value.visualArtifact;if(f.mimeType!=='image/png'||typeof f.dataBase64!=='string'||f.dataBase64.length>6000000||digest(Buffer.from(f.dataBase64,'base64'))!==f.sha256)throw new Error('The computer returned an invalid screenshot.');const frame={botId,conversationId,dataUrl:`data:image/png;base64,${f.dataBase64}`,url:f.currentUrl,title:f.pageTitle,at:Date.now()};const live=this.live.get(conversationId),previous=this.frames.get(conversationId);if(isBlankComputerFrame(frame)){}else if(!live?.ready||!previous){this.frames.set(conversationId,frame);this.onFrame(frame);}else{const metadata={...previous,url:live.url||frame.url,title:frame.title};this.frames.set(conversationId,metadata);this.onFrame(metadata);}}
     return {output:value.output,observation:value.browserObservation,outcome:value.browserOutcome,receiptId:value.receiptId,...(value.visualArtifact?{image:value.visualArtifact.dataBase64}:{})};
   }
   watch(botId,conversationId,visible){
@@ -99,7 +100,7 @@ export class CloudComputer {
     const generation=this.liveGeneration;
     const client=new ComputerLive({onFrame:value=>{
       if(this.watched?.conversationId!==conversationId||generation!==this.liveGeneration)return;
-      const previous=this.frames.get(conversationId);const frame={...previous,botId:link.botId,conversationId,...value,url:client.url||previous?.url};this.frames.set(conversationId,frame);this.onFrame(frame);
+      const previous=this.frames.get(conversationId);const frame={...previous,botId:link.botId,conversationId,...value,url:client.url||previous?.url};if(isBlankComputerFrame(frame))return;this.frames.set(conversationId,frame);this.onFrame(frame);
     },onState:ready=>{
       if(this.watched?.conversationId!==conversationId||generation!==this.liveGeneration||this.live.get(conversationId)!==client)return;
       this.onState(this.state(conversationId));

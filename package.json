@@ -1,7 +1,7 @@
 {
   "name": "gratis-core",
   "productName": "Gratis Core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Independent desktop assistants with local memory, scheduled tasks and optional connected apps",
   "type": "module",
@@ -10,6 +10,7 @@
     "start": "electron .",
     "test": "node --test test/*.test.mjs",
     "test:desktop": "node test/community-desktop.mjs",
+    "test:ui": "node test/ui-polish.mjs",
     "setup:assets": "node scripts/setup-assets.mjs",
     "verify:public": "node scripts/verify-public.mjs",
     "package:mac": "node scripts/package.mjs",

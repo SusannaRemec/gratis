@@ -1,3 +1,4 @@
+import {reconcileChildren} from './ui-dom.mjs';
 import {setupMentions} from './mentions-ui.mjs';
 import {sidebarItems} from './sidebar-items.mjs';
 import {setupThreads} from './threads-ui.mjs';
@@ -20,7 +21,9 @@ document.querySelector('#attach-menu [data-icon]').dataset.icon='plus-filled';
 document.querySelectorAll('[data-icon]').forEach(node => { renderIcon(node,node.dataset.icon); });
 let voiceInput, workspaceUI,threadUI;
 let state, editingBot = null, draftTimer, dirtyDraft = null, previousConversation = null;
-let homeVisible = true;
+let homeVisible = true, submitting = null;
+let dateView = null;
+const sidebarViews = new Map();
 const messageViews=new Map();
 let claudeConnection = null, codexConnection=null, codexModels=[],codexLoading=null;
 let pendingProfileAvatar = null, profilePhotoSequence = 0, avatarTarget = null;
@@ -49,9 +52,9 @@ function renderBotTile(b,surface='tile') {
 }
 function refreshComposer() {
   const root=currentConversation(),waiting=!!root&&(root.pendingComputerHelp||root.computerPause||state.conversations.some(c=>c.parentThreadId===root.id&&(c.pendingComputerHelp||c.computerPause)));
-  const busy = threadUI?.composing?false:isStreaming()||waiting, hasText = !!$('prompt').value.trim();
+  const busy = !!submitting || (!threadUI?.composing && (isStreaming()||waiting)), hasText = !!$('prompt').value.trim();
   $('send').hidden = !hasText; $('send').setAttribute('aria-label',busy?'Queue message':'Send message'); $('stop').hidden = !busy; $('voice-call').hidden = !!busy || hasText;
-  $('send').disabled = !hasText;
+  $('send').disabled = !hasText || !!submitting; $('stop').disabled = !!submitting?.cancelled;
   $('chat-model').disabled = !!busy;
   selects.sync();
   $('microphone').disabled = !!busy;
@@ -66,13 +69,18 @@ function render(next) {
   const focusedSidebar=document.activeElement?.closest('#bots button'),focusedKey=focusedSidebar?.dataset.conversationId||focusedSidebar?.dataset.botId;
   const pinned=sidebar.filter(item=>item.kind==='bot'&&item.pinned),pinnedGrid=el('div','pinned-bots');pinnedGrid.id='pinned-bots';pinnedGrid.setAttribute('aria-label','Pinned bots');
   for(const item of pinned){const tile=renderBotTile(item.bot,'pinned');tile.classList.add('pinned-bot');tile.setAttribute('aria-pressed',String(item.bot.id===bot?.id&&conversation?.kind!=='group'));pinnedGrid.append(tile);}
-  $('bots').replaceChildren(...(pinned.length?[pinnedGrid]:[]),...sidebar.filter(item=>item.kind!=='bot'||!item.pinned).map(item=>{
-    if(item.kind==='group')return threadUI.sidebarRow(item.conversation);
-    const b=item.bot,button=el('button','bot-item'+(b.id===bot?.id&&conversation?.kind!=='group'?' active':''));button.type='button';
-    button.dataset.botId=b.id;button.setAttribute('aria-pressed',String(b.id===bot?.id&&conversation?.kind!=='group'));
-    const meta=el('span');meta.append(el('strong',null,(b.pinned?'⌁ ':'')+b.name),el('small',null,item.preview));button.append(makeAvatar(b),meta);
-    button.onclick=()=>navigate(()=>api.selectBot({id:b.id}));button.oncontextmenu=event=>{event.preventDefault();void openBotMenu(b.id);};return button;
-  }));
+  reconcileChildren($('bots'),[...(pinned.length?[pinnedGrid]:[]),...sidebar.filter(item=>item.kind!=='bot'||!item.pinned).map(item=>{
+    if(item.kind==='group'){const row=threadUI.sidebarRow(item.conversation,sidebarViews.get(item.key));sidebarViews.set(item.key,row);return row;}
+    const b=item.bot,button=sidebarViews.get(item.key)||el('button','bot-item');button.type='button';
+    const active=b.id===bot?.id&&conversation?.kind!=='group';button.classList.toggle('active',active);button.dataset.botId=b.id;button.setAttribute('aria-pressed',String(active));
+    if(!button.children.length){const meta=el('span');meta.append(el('strong'),el('small'));button.append(makeAvatar(b),meta);}
+    const meta=button.lastElementChild;meta.querySelector('strong').textContent=(b.pinned?'⌁ ':'')+b.name;meta.querySelector('small').textContent=item.preview;
+    const busy=state.conversations.some(c=>c.messages.some(m=>m.status==='streaming'&&(m.botId||c.botId)===b.id));
+    const appearance=JSON.stringify([b.avatarDataUrl,b.avatarShape,b.avatarColor,b.avatarSeed,b.avatarDefaultShape,b.avatarDefaultColor,document.documentElement.dataset.theme,busy]);
+    if(button.dataset.appearance!==appearance){button.firstElementChild.replaceWith(makeAvatar(b));button.dataset.appearance=appearance;}
+    button.onclick=()=>navigate(()=>api.selectBot({id:b.id}));button.oncontextmenu=event=>{event.preventDefault();void openBotMenu(b.id);};sidebarViews.set(item.key,button);return button;
+  })]);
+  for(const key of sidebarViews.keys())if(!sidebar.some(item=>item.key===key))sidebarViews.delete(key);
   if(focusedKey)[...$('bots').querySelectorAll('button')].find(row=>(row.dataset.conversationId||row.dataset.botId)===focusedKey)?.focus({preventScroll:true});
   $('sidebar-empty').hidden=sidebar.length>0;$('sidebar-empty').textContent=query?'No chats match your search.':'No bots or chats yet.';
   $('home-bots').replaceChildren(...filteredBots.map(b=>renderBotTile(b)));
@@ -101,7 +109,7 @@ function render(next) {
   if (previousConversation !== conversation.id) {
     $('prompt').value = dirtyDraft?.conversationId === conversation.id ? dirtyDraft.text : conversation.draft;
     previousConversation = conversation.id; $('notice').hidden = true;
-  } else if (!dirtyDraft && document.activeElement !== $('prompt')) $('prompt').value = conversation.draft;
+  } else if (!dirtyDraft && submitting?.conversationId!==conversation.id && document.activeElement !== $('prompt')) $('prompt').value = conversation.draft;
   }
   $('message-queue').hidden=!(conversation.queue||[]).length;
   $('message-queue').replaceChildren();
@@ -117,6 +125,7 @@ function render(next) {
   updateView();
 }
 function updateView() {
+  if(homeVisible)workspaceUI?.hideForHome();
   const composing=!!threadUI?.composing;document.querySelector('main').classList.toggle('new-thread-composing',composing);document.querySelector('.topbar').hidden=composing;
   document.querySelector('.header-actions').hidden = homeVisible;
   $('bot-picker').hidden = !homeVisible;
@@ -130,14 +139,12 @@ function updateView() {
 }
 function renderMessages(bot, conversation) {
   const container = $('messages'), stayBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 90;
-  const focused = document.activeElement?.dataset?.questionId;
-  const selection = focused ? [document.activeElement.selectionStart, document.activeElement.selectionEnd] : null;
   if (!conversation.messages.length) {
     container.replaceChildren(); return;
   }
   const expanded=new Set([...container.querySelectorAll('details[open][data-activity-id]')].map(node=>node.dataset.activityId));
   const nodes = conversation.messages.map((m, index) => {
-    const signature=JSON.stringify(m)+(m.question?JSON.stringify([isStreaming(),dirtyDraft?.text,conversation.draft,conversation.messages.length]):'');
+    const signature=JSON.stringify(m)+(m.question?JSON.stringify([isStreaming(),conversation.messages.length]):'');
     const cached=messageViews.get(m.id);if(cached?.signature===signature)return cached.node;
     const item = el('article', `message ${m.role}`); item.dataset.messageId = m.id; item.dataset.status = m.status; item.dataset.kind = m.kind || 'chat';
     const speaker=m.botId?state.bots.find(b=>b.id===m.botId)||bot:bot;const content = el('div', 'message-content'); const provider = m.provider === 'demo' ? ' · local demo' : '';
@@ -152,17 +159,13 @@ function renderMessages(bot, conversation) {
       for (const [index, option] of choices.entries()) {
         const button = el('button','question-option');button.disabled=answered||isStreaming();
         button.append(el('span','option-key',String.fromCharCode(65+index)),el('span',null,option));
-        button.onclick = () => run(() => api.send({conversationId:conversation.id,text:option}));
+        button.onclick = () => submitMessage(option);
         options.append(button);
       }
       if (m.question.custom || hasLegacyCustom) {
-        const form=el('form','question-option custom-option');
-        const input=el('input');input.type='text';input.placeholder='Something else';input.setAttribute('aria-label','Other response');input.dataset.questionId=m.id;input.disabled=answered||isStreaming();
-        input.value = answered ? '' : dirtyDraft?.conversationId===conversation.id ? dirtyDraft.text : conversation.draft;
-        input.oninput=()=>{$('prompt').value=input.value;draftChanged();};
-        form.append(el('span','option-key',String.fromCharCode(65+choices.length)),input);
-        form.onsubmit=event=>{event.preventDefault();const value=input.value.trim();if(value){clearTimeout(draftTimer);dirtyDraft=null;run(()=>api.send({conversationId:conversation.id,text:value}));}};
-        options.append(form);
+        const button=el('button','question-option custom-option');button.type='button';button.disabled=answered||isStreaming();
+        button.append(el('span','option-key',String.fromCharCode(65+choices.length)),el('span',null,'Something else'));
+        button.onclick=()=>$('prompt').focus();options.append(button);
       }
       question.append(options);
       content.append(question);
@@ -189,8 +192,9 @@ function renderMessages(bot, conversation) {
   const activeIds=new Set(conversation.messages.map(m=>m.id));for(const id of messageViews.keys())if(!activeIds.has(id))messageViews.delete(id);
   const date = new Date(conversation.messages[0].createdAt);
   const dateLabel = date.toDateString() === new Date().toDateString() ? 'Today' : date.toLocaleDateString(undefined,{month:'short',day:'numeric'});
-  container.replaceChildren(el('div','date-separator',`${dateLabel} ${date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}`),...nodes);
-  if (focused) {const input=[...container.querySelectorAll('[data-question-id]')].find(input=>input.dataset.questionId===focused);if(input&&!input.disabled){input.focus({preventScroll:true});input.setSelectionRange(...selection);}}
+  const stamp=`${dateLabel} ${date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}`;
+  if(!dateView||dateView.textContent!==stamp)dateView=el('div','date-separator',stamp);
+  reconcileChildren(container,[dateView,...nodes]);
   if (stayBottom || previousConversation !== conversation.id) container.scrollTop = container.scrollHeight;
 }
 function renderAttention(root){
@@ -215,14 +219,22 @@ async function flushDraft() {
 async function navigate(fn) { if(workspaceUI&&await workspaceUI.beforeNavigate()===false)return;threadUI?.cancel();voiceInput?.cancel(); selects.close(); await flushDraft(); const result = await run(fn); if (!result) return; homeVisible = false; updateView(); $('messages').scrollTop = $('messages').scrollHeight; $('prompt').focus(); }
 $('prompt').addEventListener('input', draftChanged);
 $('prompt').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('composer').requestSubmit(); } });
-$('composer').onsubmit = async e => {
-  e.preventDefault(); const input = $('prompt').value.trim(); if (!input || voiceInput?.active) return;
-  let conversationId=state.activeConversationId;if(threadUI?.composing){try{conversationId=await threadUI.commit();}catch(error){notice(error);return;}} clearTimeout(draftTimer); dirtyDraft = null;
-  $('notice').hidden = true;
-  const result = await run(() => api.send({ conversationId, text: input }));
-  if (result) { $('prompt').value = ''; refreshComposer(); $('messages').scrollTop = $('messages').scrollHeight; }
-};
-$('stop').onclick = () => run(() => api.stop({ conversationId: state.activeConversationId }));
+async function submitMessage(value=$('prompt').value) {
+  const input=value.trim();if(!input||voiceInput?.active||submitting)return;
+  const job={conversationId:state.activeConversationId,cancelled:false};submitting=job;
+  const original=value;clearTimeout(draftTimer);dirtyDraft=null;$('prompt').value='';$('notice').hidden=true;refreshComposer();
+  try{
+    if(threadUI?.composing)job.conversationId=await threadUI.commit();
+    if(job.cancelled){if(state.activeConversationId===job.conversationId&&!$('prompt').value){$('prompt').value=original;draftChanged();}return;}
+    const result=await run(()=>api.send({conversationId:job.conversationId,text:input}));
+    if(job.cancelled&&result)await run(()=>api.stop({conversationId:job.conversationId}));
+    if(!result&&state.activeConversationId===job.conversationId&&!$('prompt').value){$('prompt').value=original;draftChanged();}
+    if(result&&state.activeConversationId===job.conversationId)$('messages').scrollTop=$('messages').scrollHeight;
+  }catch(error){notice(error);if(state.activeConversationId===job.conversationId&&!$('prompt').value){$('prompt').value=original;draftChanged();}}
+  finally{if(submitting===job)submitting=null;refreshComposer();}
+}
+$('composer').onsubmit=e=>{e.preventDefault();return submitMessage();};
+$('stop').onclick=()=>{if(submitting)submitting.cancelled=true;refreshComposer();return run(()=>api.stop({conversationId:submitting?.conversationId||state.activeConversationId}));};
 $('conversations').onchange = e => navigate(() => api.selectConversation({ id: e.target.value }));
 $('new-chat').onclick = async () => { await navigate(() => api.newConversation({ botId: state.activeBotId })); $('bot-dialog').close(); };
 $('show-bots').onclick = async () => {threadUI?.cancel(); await flushDraft(); voiceInput?.cancel(); selects.close(); homeVisible = true; updateView(); };
@@ -251,7 +263,7 @@ function openBotDialog(edit = true) {
   fillModels($('bot-model'),modelsForProvider(),state.settings.provider==='codex'?bot?.codexModel||'':bot?.model||'',true); $('bot-memory').value=bot?.memory||''; for(const key of ['web','files','computer','connections'])$('bot-'+key).checked=bot?.capabilities?.[key]!==false;
   $('avatar-controls').hidden = !edit; $('bot-dialog').showModal(); selects.sync(); $('bot-title').focus();
 }
-const createBot = setupCreateBot({api,onCreated:next=>{homeVisible=false;render(next);workspaceUI?.openComputer();$('messages').scrollTop=$('messages').scrollHeight;$('prompt').focus();}});
+const createBot = setupCreateBot({api,onCreated:next=>{homeVisible=false;workspaceUI?.hideForHome();render(next);$('messages').scrollTop=$('messages').scrollHeight;$('prompt').focus();}});
 $('new-bot').onclick = async () => {await flushDraft();voiceInput?.cancel();selects.close();createBot.open();}; $('edit-bot').onclick = () => {if(!threadUI?.showDetails())openBotDialog(true);};
 $('bot-form').onsubmit = async e => { e.preventDefault(); const value = { name: $('bot-title').value.trim(), instructions: $('bot-system').value, userPromptTemplate: $('bot-user-template').value, [state.settings.provider==='codex'?'codexModel':'model']:$('bot-model').value, memory:$('bot-memory').value, capabilities:Object.fromEntries(['web','files','computer','connections'].map(key=>[key,$('bot-'+key).checked])) };
   if (value.userPromptTemplate.trim() && !value.userPromptTemplate.includes('{{message}}')) { $('bot-user-template').setCustomValidity('Include {{message}} where your message should go.'); $('bot-user-template').reportValidity(); return; }

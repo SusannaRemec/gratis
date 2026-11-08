@@ -8,3 +8,9 @@ body{background:var(--bg)}button,input,textarea,select{font-family:inherit}butto
 .composer-area{padding:12px 28px 22px}.composer{border-radius:15px;border:1px solid var(--line);background:var(--card);box-shadow:0 5px 18px #14201d08}.composer button{border-radius:10px}#send{background:var(--accent);color:var(--bg)}#prompt{font-size:14px}#voice-mode{background:var(--accent-soft);color:var(--accent)}.primary{background:var(--accent);color:var(--bg);border-color:var(--accent);border-radius:9px}.quiet-button{background:var(--card);border-color:var(--line);border-radius:9px}dialog{border-radius:18px;border:1px solid var(--line);background:var(--card);box-shadow:0 18px 70px #0003}.dialog-heading h2{font-size:22px;font-weight:650}.dialog-heading{border-bottom:1px solid var(--line)}label input,label textarea,label select{border-radius:9px;background:var(--bg)}.bot-tile{border-radius:16px}.bot-tile:hover{background:var(--hover)}.bot-tile-avatar{width:62px!important;height:62px!important}.bot-tile-label{font-weight:550}#work-panel{background:var(--card)}.workspace-heading{background:var(--card)}
 @media(max-width:1000px){.topbar{padding:16px;flex-wrap:wrap}.messages{padding:24px}.composer-area{padding:12px 18px 18px}}
 @media(max-width:710px){:root{--sidebar-width:76px}.sidebar-toolbar{padding:46px 12px 12px}.messages{padding:18px}.composer-area{padding:10px}.sidebar-bottom{padding:10px}}
+
+/* Keep Send and Stop the same size and contrast in either theme. */
+#stop.composer-circle{display:grid;place-items:center;flex:none;width:34px;height:34px;min-width:34px;padding:0;border:0;border-radius:10px;background:var(--accent);color:var(--bg);line-height:1}
+#stop svg{display:block;width:19px;height:19px}
+.messages{scroll-behavior:auto}
+:root[data-theme=dark] .provider-logo[src$="/openai.svg"]{filter:invert(1)}

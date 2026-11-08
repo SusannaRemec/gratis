@@ -24,3 +24,7 @@ label>.select-trigger{margin-top:8px;font-weight:400}
 @keyframes select-appear{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.select-menu:popover-open{animation:none}.select-trigger{transition:none}}
 .select-option:focus-visible{outline:0;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--text) 16%,transparent)}
+
+label>.select-trigger{min-height:40px;padding:10px 12px}
+.select-option{min-height:40px;padding:10px 12px}
+.select-option-label{flex:1}

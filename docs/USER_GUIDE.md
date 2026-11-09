@@ -35,3 +35,11 @@ Connect an existing T3 MCP environment by address in Tasks. Gratis does not repl
 ## What to verify
 
 Check sources, files and final outcomes. A tool error is not a completed action. Neither provider access nor automation makes every website or workflow reliable. Use a small reversible task first when setting up a new connection.
+
+## Custom schedules and finding files
+
+In Scheduled tasks, choose **Custom cron** for a five-field expression: minute, hour, day of month, month and weekday. `0 9 1 * *` runs at 9 AM on the first day of each month; `0 9 * * 1-5` runs on weekdays. Set the IANA timezone explicitly. The saved card shows the next actual run. Invalid expressions cannot replace a saved schedule.
+
+Cron schedules use the same pause, resume, run-now and missed-run coalescing as other scheduled tasks. They run only while Gratis is running and the computer is awake. Repeated clock times during the autumn daylight-saving change are not replayed. A cron time that falls in the spring clock gap runs at the next valid instant; weekly schedules retain their existing skip-the-gap behavior.
+
+In **Files**, filter by filename or folder path, and sort by recent changes, name or size. Filtering stays inside the selected bot's files and resets when switching to another bot. Files stay where they are; filtering and sorting do not move or rename them.

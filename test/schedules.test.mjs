@@ -18,3 +18,25 @@ test('daylight saving fall-back does not schedule a second daily run',()=>{const
 test('a user turn arriving while schedule persistence waits is never overwritten',async t=>{const f=await setup(t);const item=await f.s.create({conversationId:f.chat,title:'Daily',prompt:'Timer task',timing});const save=f.s.save.bind(f.s);let raced=false;f.s.save=async()=>{await save();if(!raced){raced=true;f.service._conversation(f.chat).queuePaused=true;}};await f.s.runNow({id:item.id,conversationId:f.chat});assert.equal(f.s.get(item.id,f.chat).runs[0].status,'deferred');assert.equal(f.service._conversation(f.chat).messages.length,0);});
 test('stopping a scheduled run pauses its next occurrence even when the chat queue is paused',async t=>{const f=await setup(t,async function*({signal}){yield 'Working';await new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));});const item=await f.s.create({conversationId:f.chat,title:'Daily',prompt:'Check',timing});await f.s.runNow({id:item.id,conversationId:f.chat});await f.service.stop({conversationId:f.chat});f.service._conversation(f.chat).queuePaused=true;await f.s.tick();assert.equal(f.s.get(item.id,f.chat).enabled,false);assert.equal(f.s.get(item.id,f.chat).runs[0].status,'needs_review');});
 test('a completed delivered run recovered after a crash is recorded without replay',async t=>{const f=await setup(t);const item=await f.s.create({conversationId:f.chat,title:'Daily',prompt:'Check',timing});await f.s.runNow({id:item.id,conversationId:f.chat});await f.service.whenIdle();const before=f.service._conversation(f.chat).messages.length;const reopened=await new Schedules(f.options).init();await reopened.tick();assert.equal(reopened.get(item.id,f.chat).runs[0].status,'completed');assert.equal(f.service._conversation(f.chat).messages.length,before);await reopened.close();});
+
+test('custom cron supports monthly, ranges, steps and timezone-aware next runs',()=>{
+ const monthly=validateTiming({kind:'cron',expression:' 0  9 1 * * ',timezone:'America/Toronto'});
+ assert.equal(monthly.expression,'0 9 1 * *');assert.equal(new Date(nextRun(monthly,Date.parse('2026-11-15T12:00Z'))).toISOString(),'2026-12-01T14:00:00.000Z');
+ const stepped=validateTiming({kind:'cron',expression:'*/15 9-17 * * 1-5',timezone:'UTC'});
+ assert.equal(new Date(nextRun(stepped,Date.parse('2026-11-09T09:01Z'))).toISOString(),'2026-11-09T09:15:00.000Z');
+ assert.throws(()=>validateTiming({kind:'cron',expression:'* * * * * *',timezone:'UTC'}),/five-field/);
+ assert.throws(()=>validateTiming({kind:'cron',expression:'0 0 30 2 *',timezone:'UTC'}),/future run/);
+ assert.throws(()=>validateTiming({kind:'cron',expression:'not a valid cron expression',timezone:'UTC'}));
+});
+test('custom cron does not repeat the fall-back occurrence; spring gaps use the next valid instant',()=>{
+ const timing={kind:'cron',expression:'30 1 * * *',timezone:'America/Toronto'};
+ assert.equal(new Date(nextRun(timing,Date.parse('2026-11-01T05:31Z'),Date.parse('2026-11-01T05:30Z'))).toISOString(),'2026-11-02T06:30:00.000Z');
+ assert.equal(new Date(nextRun({...timing,expression:'30 2 * * *'},Date.parse('2026-03-08T05:00Z'))).toISOString(),'2026-03-08T07:00:00.000Z');
+});
+test('custom cron survives restart and coalesces missed occurrences without extra replies',async t=>{
+ let calls=0;const f=await setup(t,async function*(){calls++;yield 'Monthly check';});
+ const item=await f.s.create({conversationId:f.chat,title:'Monthly',prompt:'Check saved work',timing:{kind:'cron',expression:'0 9 1 * *',timezone:'America/Toronto'}});
+ const reopened=await new Schedules(f.options).init();assert.equal(reopened.get(item.id,f.chat).timing.expression,'0 9 1 * *');await reopened.close();
+ f.setNow(Date.parse('2027-02-03T16:00Z'));await f.s.tick();await f.service.whenIdle();await f.s.tick();await f.s.tick();
+ assert.equal(calls,1);assert.equal(new Date(f.s.get(item.id,f.chat).nextRunAt).toISOString(),'2027-03-01T14:00:00.000Z');
+});

@@ -45,3 +45,4 @@ jobs:
           export GRATIS_TEST_APP="$PWD/release/Gratis Core-darwin-$(node -p process.arch)/Gratis Core.app/Contents/MacOS/Gratis Core"
           node test/package-edition.mjs
           npm run test:ui
+          node test/desktop-features.mjs

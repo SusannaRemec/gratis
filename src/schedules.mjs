@@ -1,10 +1,23 @@
 import {mkdir,readFile,writeFile,rename} from 'node:fs/promises';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
+import {Cron} from 'croner';
 const required=(v,label,max)=>{if(typeof v!=='string'||!v.trim()||v.length>max)throw new Error(`Enter ${label} under ${max} characters.`);return v.trim();};
+function cronDate(timing,after){
+ const cron=new Cron(timing.expression,{timezone:timing.timezone,paused:true});
+ try{const next=cron.nextRun(new Date(after));if(!next)throw new Error('This cron expression has no future run.');return next.getTime();}finally{cron.stop();}
+}
 export function validateTiming(value){
+ if(!value||typeof value!=='object')throw new Error('Choose a schedule.');
  const timezone=value.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone;
  try{new Intl.DateTimeFormat('en',{timeZone:timezone}).format();}catch{throw new Error('Choose a valid timezone, such as America/Toronto.');}
+ if(value.kind==='cron'){
+  const expression=typeof value.expression==='string'?value.expression.trim().replace(/\s+/g,' '):'';
+  if(expression.length>120||expression.split(' ').length!==5)throw new Error('Enter a five-field cron expression: minute hour day month weekday.');
+  const timing={kind:'cron',expression,timezone};
+  try{cronDate(timing,Date.now());}catch{throw new Error('Choose a valid cron expression with a future run.');}
+  return timing;
+ }
  if(value.kind==='interval'){
   if(!Number.isInteger(value.minutes)||value.minutes<15||value.minutes>10080)throw new Error('Choose an interval from 15 minutes to one week.');
   return{kind:'interval',minutes:value.minutes,timezone};
@@ -15,6 +28,7 @@ export function validateTiming(value){
  return{kind:'weekly',time:value.time,days,timezone};
 }
 export function nextRun(timing,after,servedAt){
+ if(timing.kind==='cron')return cronDate(timing,Math.max(after,servedAt??after));
  if(timing.kind==='interval')return after+timing.minutes*60000;
  // Iterate actual instants, so daylight-saving gaps are skipped and repeated
  // wall-clock times do not require inventing a timezone offset.

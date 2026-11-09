@@ -1,4 +1,4 @@
-import {_electron as electron} from '@playwright/test';
+import {launchTestApp} from './electron-fixture.mjs';
 import {mkdtemp,writeFile,mkdir,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';import path from 'node:path';import assert from 'node:assert/strict';
 import {initialState} from '../src/store.mjs';
@@ -6,7 +6,7 @@ const root=process.cwd(),dataDir=await mkdtemp(path.join(tmpdir(),'gratis-ui-'))
 base.name='Research';base.avatarShape='blob';base.avatarColor='cyan';base.promptMode='manual';base.promptGenerated=true;
 state.bots.push({...base,id:'writer-demo',name:'Editor',avatarShape:'tablet',avatarColor:'violet'},{...base,id:'planner-demo',name:'Planner',avatarShape:'hex',avatarColor:'orange'});
 const c=state.conversations[0];c.kind='group';c.title='A clearer launch guide';c.participantIds=[base.id,'writer-demo','planner-demo'];c.messages=[{id:'example-user',role:'user',content:'Help me make the launch guide useful for a first-time reader.',status:'complete',createdAt:now},{id:'example-peer',role:'assistant',botId:'writer-demo',content:'**Three reading paths**\n\n- **Start:** install, connect, send a first message.\n- **Use:** learn groups, memory and scheduled work.\n- **Build:** explore the architecture and extend the app.\n\nKeep examples synthetic and label optional integrations clearly.',status:'complete',createdAt:now},{id:'example-lead',role:'assistant',content:'Agreed. I’ll make the first successful task the quickstart’s finish line, then link to the deeper guides. Each path should work on its own.',status:'complete',createdAt:now}];state.settings.displayName='Example workspace';
-await writeFile(path.join(dataDir,'workspace.json'),JSON.stringify(state));const app=await electron.launch({...(process.env.GRATIS_TEST_APP?{executablePath:process.env.GRATIS_TEST_APP}:{args:[root]}),env:{...process.env,GRATIS_DATA_DIR:dataDir,GRATIS_TEST_HIDDEN:'1'}});const errors=[];
+await writeFile(path.join(dataDir,'workspace.json'),JSON.stringify(state));const app=await launchTestApp({directory:dataDir,projectDir:root,executablePath:process.env.GRATIS_TEST_APP});const errors=[];
 try{const page=await app.firstWindow();page.on('pageerror',e=>errors.push(e.message));await page.locator('#new-bot').waitFor();await page.evaluate(()=>{localStorage.setItem('orbit-appearance','light');});await page.reload();await page.locator('.team-thread').click();await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setSize(1360,900));
  await page.locator('#messages').evaluate(el=>el.scrollTop=0);
  const folder=path.join(root,'docs/screenshots');await mkdir(folder,{recursive:true});const capture=async name=>{await page.waitForTimeout(150);const buffer=await app.evaluate(async({BrowserWindow})=>(await BrowserWindow.getAllWindows()[0].webContents.capturePage()).toPNG().toString('base64'));await writeFile(path.join(folder,name),Buffer.from(buffer,'base64'));};

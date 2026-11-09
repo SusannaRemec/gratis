@@ -40,3 +40,5 @@ main.workspace-open{padding-right:var(--workspace-width,360px)}#work-panel{width
 
 .computer-keyboard{position:fixed;left:-10000px;top:0;width:2px;height:2px;opacity:0;pointer-events:none}
 #computer-screen{touch-action:none;user-select:none;-webkit-user-drag:none}#computer-screen[data-control=human]{cursor:default}
+
+.workspace-file-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.workspace-file-tools input{min-width:100px;flex:1}.workspace-file-tools select,.workspace-file-tools .custom-select{max-width:155px}.workspace-file-tools input,.workspace-file-tools select{box-sizing:border-box}

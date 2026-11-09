@@ -1,4 +1,4 @@
-import {_electron as electron} from '@playwright/test';
+import {launchTestApp} from './electron-fixture.mjs';
 import {createServer} from 'node:http';
 import {mkdtemp,writeFile,mkdir,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -13,7 +13,7 @@ const state=initialState(),bot=state.bots[0],chat=state.conversations[0];bot.pro
 state.settings={...state.settings,provider:'local',baseUrl:`http://127.0.0.1:${server.address().port}/v1`,model:'ui-fixture',appearance:'dark'};
 chat.messages=[{id:'history',role:'assistant',content:'An earlier **saved** answer.',status:'complete',createdAt:Date.now()-1000}];
 await writeFile(path.join(directory,'workspace.json'),JSON.stringify(state));
-const app=await electron.launch({...(process.env.GRATIS_TEST_APP?{executablePath:process.env.GRATIS_TEST_APP}:{args:[process.cwd()]}),env:{...process.env,GRATIS_DATA_DIR:directory,GRATIS_TEST_HIDDEN:'1'}});const errors=[];
+const app=await launchTestApp({directory,executablePath:process.env.GRATIS_TEST_APP});const errors=[];
 try{
  const page=await app.firstWindow();page.on('pageerror',e=>errors.push(e.message));await page.locator('#new-bot').waitFor();await page.evaluate(()=>localStorage.setItem('orbit-appearance','dark'));await page.reload();await page.locator('#new-bot').waitFor();await app.evaluate(({BrowserWindow})=>{const win=BrowserWindow.getAllWindows()[0];win.webContents.setBackgroundThrottling(false);win.setSize(1300,850);});await page.locator('#home-bots .bot-tile').first().click();
  const capture=async name=>{await page.locator('.select-menu:popover-open').evaluateAll(menus=>Promise.all(menus.flatMap(menu=>menu.getAnimations()).map(animation=>animation.finished)));await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const bytes=await app.evaluate(async({BrowserWindow})=>(await BrowserWindow.getAllWindows()[0].webContents.capturePage()).toPNG().toString('base64'));await writeFile(path.join(output,name),Buffer.from(bytes,'base64'));};

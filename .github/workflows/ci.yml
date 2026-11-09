@@ -46,3 +46,4 @@ jobs:
           node test/package-edition.mjs
           npm run test:ui
           node test/desktop-features.mjs
+          node test/recovery-desktop.mjs

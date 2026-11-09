@@ -1,3 +1,4 @@
+import {DEFAULT_RUN_LIMITS} from './run-limits.mjs';
 import {reconcileChildren} from './ui-dom.mjs';
 import {setupMentions} from './mentions-ui.mjs';
 import {sidebarItems} from './sidebar-items.mjs';
@@ -241,6 +242,8 @@ $('show-bots').onclick = async () => {threadUI?.cancel(); await flushDraft(); vo
 $('search-bots').onclick = () => { $('bot-filter').hidden = !$('bot-filter').hidden; if (!$('bot-filter').hidden) $('bot-filter').focus(); };
 $('bot-filter').oninput = () => render(state);
 $('workspace-profile').onclick = () => openSettings();
+$('create-checkpoint').onclick=()=>run(async()=>{const path=await api.recoveryCheckpoint();$('recovery-status').textContent=path?'Recovery checkpoint saved. Open the recovery folder to find it.':'No saved workspace yet.';});
+$('open-checkpoints').onclick=()=>run(()=>api.recoveryFolder());
 $('export-workspace').onclick = () => run(() => api.exportData('workspace'));
 $('share-conversation').onclick = () => run(() => api.exportData('conversation'));
 $('attach-menu').onclick = () => run(()=>api.attachFiles({conversationId:state.activeConversationId}));
@@ -315,6 +318,7 @@ function openSettings() {
   fillModels($('codex-model'),codexModels,state.settings.provider==='codex'?state.settings.model:state.settings.providerDefaults?.codex?.model);
   $('claude-effort').value = state.settings.provider==='claude'?state.settings.effort||'medium':state.settings.providerDefaults?.claude?.effort||'medium';
   syncCodexEffort(state.settings.provider==='codex'?state.settings.effort:state.settings.providerDefaults?.codex?.effort);
+  for(const [key,value] of Object.entries({...DEFAULT_RUN_LIMITS,...state.settings.runLimits}))$('limit-'+key).value=value;
   $('voice-language').value = state.settings.voiceLanguage || 'en';
   $('claude-model').onchange();
   $('appearance').value = localStorage.getItem('orbit-appearance') || 'system'; $('provider').onchange(); $('settings-dialog').showModal(); selects.sync();
@@ -350,7 +354,7 @@ async function checkCodexConnection(){
 $('check-codex').onclick=checkCodexConnection;
 $('settings-button').onclick = openSettings; $('configure-backend').onclick = openSettings;
 $('settings-form').onsubmit = async e => { e.preventDefault();
-  const result = await run(() => api.updateSettings({ profileAvatarDataUrl: pendingProfileAvatar, displayName: $('profile-name').value.trim(), provider: $('provider').value, baseUrl: $('base-url').value.trim(), model: $('provider').value === 'claude' ? $('claude-model').value : $('provider').value==='codex'?$('codex-model').value:$('model').value.trim(), effort: $('provider').value==='codex'?$('codex-effort').value:$('claude-effort').value, voiceCleanup: true, voiceLanguage: $('voice-language').value }));
+  const result = await run(() => api.updateSettings({ runLimits:Object.fromEntries(Object.keys(DEFAULT_RUN_LIMITS).map(key=>[key,Number($('limit-'+key).value)])),profileAvatarDataUrl: pendingProfileAvatar, displayName: $('profile-name').value.trim(), provider: $('provider').value, baseUrl: $('base-url').value.trim(), model: $('provider').value === 'claude' ? $('claude-model').value : $('provider').value==='codex'?$('codex-model').value:$('model').value.trim(), effort: $('provider').value==='codex'?$('codex-effort').value:$('claude-effort').value, voiceCleanup: true, voiceLanguage: $('voice-language').value }));
   if (result) { localStorage.setItem('orbit-appearance', $('appearance').value); applyTheme(await api.systemDark()); $('settings-dialog').close(); }
 };
 function applyTheme(systemDark) { const choice = localStorage.getItem('orbit-appearance') || 'system'; document.documentElement.dataset.theme = choice === 'system' ? (systemDark ? 'dark' : 'light') : choice; if (state) render(state); }

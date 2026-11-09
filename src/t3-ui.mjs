@@ -1,5 +1,5 @@
 import {renderMarkdown} from './markdown.mjs';
-const $=id=>document.getElementById(id),labels={submitting:'Starting',queued:'Queued',running:'Working',completed:'Finished',failed:'Failed',interrupted:'Interrupted',cancelled:'Stopped',cancel_requested:'Stopping',needs_input:'Needs your input',needs_review:'Check in T3',disconnected:'Reconnecting',idle:'Ready'};
+const $=id=>document.getElementById(id),labels={submitting:'Starting',queued:'Queued',running:'Working',completed:'Finished',failed:'Failed',interrupted:'Interrupted',cancelled:'Stopped',cancel_requested:'Stopping',needs_input:'Needs your input',needs_review:'Check in T3',monitoring_paused:'Monitoring paused',disconnected:'Reconnecting',idle:'Ready'};
 export function setupT3UI({api,getState,onOpenConnections}){
  let state=null,projects=[],providers=[],threads=[],loaded=false,refreshing=false,refreshAgain=false,scopeId=null,saving=false,layoutInitialized=false;
  const context=()=>({conversationId:getState()?.activeConversationId});
@@ -25,7 +25,7 @@ export function setupT3UI({api,getState,onOpenConnections}){
    const result=job.result||job.items?.filter(i=>i.text&&/assistant|agent_message|response/i.test(i.type)).map(i=>i.text).join('\n\n');if(result){const body=document.createElement('div');body.className='markdown t3-result';body.append(renderMarkdown(result));card.append(body);}
    const actions=document.createElement('div');actions.className='t3-task-actions';actions.append(button('Refresh',()=>api.t3Refresh({...context(),id:job.id}).then(refresh)));
    if(job.link)actions.append(button('Open in T3',()=>api.t3Open({...context(),id:job.id})));
-   if(['disconnected','needs_review'].includes(job.status))actions.append(button('Retry',()=>api.t3Retry({...context(),id:job.id}).then(refresh)));
+   if(['disconnected','needs_review','monitoring_paused'].includes(job.status))actions.append(button(job.status==='monitoring_paused'?'Resume monitoring':'Retry',()=>api.t3Retry({...context(),id:job.id}).then(refresh)));
    if(job.threadId&&!['completed','cancelled','interrupted','failed'].includes(job.status))actions.append(button('Stop task',()=>api.t3Stop({...context(),id:job.id}).then(refresh)));
    card.append(actions);
    if(job.threadId){const form=document.createElement('form');form.className='t3-followup';form.dataset.jobId=job.id;const input=document.createElement('input');input.value=drafts.get(job.id)||'';input.placeholder='Follow up in this thread…';input.setAttribute('aria-label','Follow up on '+job.title);const send=button('Send',async()=>{});send.type='submit';form.append(input,send);form.onsubmit=async e=>{e.preventDefault();if(!input.value.trim())return;send.disabled=true;try{await api.t3Send({...context(),id:job.id,message:input.value});input.value='';await refresh();}catch(e){error(e);}finally{send.disabled=false;}};card.append(form);}

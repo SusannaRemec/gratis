@@ -1,3 +1,4 @@
+import {validateRunLimits} from './run-limits.mjs';
 import {withMemoryContext} from './memory-context.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { streamClaudeReply } from './claude-backend.mjs';
@@ -18,7 +19,7 @@ export function validateSettings(value) {
   if (value.effort !== undefined && !['minimal','low', 'medium', 'high','xhigh','max','ultra','persistent'].includes(value.effort)) throw new Error('Choose low, medium, or high response effort.');
   if (value.voiceCleanup !== undefined && typeof value.voiceCleanup !== 'boolean') throw new Error('Choose whether to use Haiku transcript cleanup.');
   if (value.voiceLanguage !== undefined && !['en', 'auto'].includes(value.voiceLanguage)) throw new Error('Choose English or automatic language detection.');
-  return { profileAvatarDataUrl: value.profileAvatarDataUrl ?? null, displayName: value.displayName?.trim() || '', provider: value.provider, baseUrl: url.href.replace(/\/+$/, ''), model: value.model.trim(), effort: value.effort || 'medium', voiceCleanup: value.voiceCleanup !== false, voiceLanguage: value.voiceLanguage || 'en' };
+  return { runLimits:validateRunLimits(value.runLimits), profileAvatarDataUrl: value.profileAvatarDataUrl ?? null, displayName: value.displayName?.trim() || '', provider: value.provider, baseUrl: url.href.replace(/\/+$/, ''), model: value.model.trim(), effort: value.effort || 'medium', voiceCleanup: value.voiceCleanup !== false, voiceLanguage: value.voiceLanguage || 'en' };
 }
 
 async function* demoReply({ bot, messages, signal }) {

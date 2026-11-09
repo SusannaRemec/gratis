@@ -28,6 +28,7 @@ export function setupWorkspace({api,getState,run,avatar,onOpenSource}){
     $('workspace-file-count').textContent=`${rows.length} of ${fileRows.length} files`;
     $('workspace-files-empty').hidden=rows.length>0;$('workspace-files-empty').textContent=fileRows.length?'No files match this search.':'Files you attach and files your bot creates appear here.';
   }
+  $('workspace-open-folder').onclick=()=>api.openFilesFolder({botId:fileOwner||bot().id}).catch(showError);
   $('workspace-file-filter').addEventListener('input',renderFiles);$('workspace-file-sort').addEventListener('change',renderFiles);
   async function refresh(){
     if(!tab||!bot())return;if(refreshing){refreshAgain=true;return;}const requestedTab=tab,requestedId=state()?.activeConversationId,requestedEpoch=viewEpoch;const current=()=>tab===requestedTab&&state()?.activeConversationId===requestedId&&viewEpoch===requestedEpoch;refreshing=true;$('workspace-error').hidden=true;

@@ -6,6 +6,9 @@ async function invoke(channel, value) {
 }
 for (const name of ['snapshot','createBot','deleteBot','selectBot','newConversation','selectConversation','setDraft',
   'createThread','renameThread','updateThreadMembers','pinThread','deleteThread','updateSettings','updateBot','duplicateBot','respondApproval', 'updateQueue','send','stop','retry']) api[name] = value => invoke('orbit:' + name, value);
+api.recoveryCheckpoint=()=>invoke('orbit:recovery-checkpoint');
+api.recoveryFolder=()=>invoke('orbit:recovery-folder');
+api.openFilesFolder=value=>invoke('orbit:files-folder',value);
 api.edition = () => invoke('orbit:edition');
 api.pickImage = options => invoke('orbit:pick-image', options);
 api.openExternal = value => invoke('orbit:open-external', value);

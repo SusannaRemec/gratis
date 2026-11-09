@@ -1,3 +1,4 @@
+import {validateRunLimits} from './run-limits.mjs';
 import {withMemoryContext} from './memory-context.mjs';
 import {compactValue,traceValue} from './computer-checkpoint.mjs';
 import { access, mkdir } from 'node:fs/promises';
@@ -95,7 +96,7 @@ export function createClaudeReply({ query: injectedQuery, resolveExecutable = fi
       signal.addEventListener('abort', abort, { once: true });
       if (signal.aborted) abort();
       let timedOut = false, run, output = '', sessionId, successful = false;
-      const timer = setTimeout(() => { timedOut = true; controller.abort(); }, runtime ? Math.max(timeoutMs,600000) : timeoutMs);
+      const timer = setTimeout(() => { timedOut = true; controller.abort(); }, settings.runLimits?validateRunLimits(settings.runLimits).minutes*60000:runtime ? Math.max(timeoutMs,600000) : timeoutMs);
       timer.unref?.();
       try {
         run = query({
@@ -104,7 +105,7 @@ export function createClaudeReply({ query: injectedQuery, resolveExecutable = fi
             cwd: workspaceDir, pathToClaudeCodeExecutable: executable, env,
             model: settings.model, ...(settings.model !== 'haiku' ? { effort: settings.effort || 'medium' } : {}),
             systemPrompt, ...(resume ? { resume } : {}),
-            includePartialMessages: true, maxTurns: runtime ? 32 : 1, abortController: controller,
+            includePartialMessages: true, maxTurns: runtime ? Math.min(1000,validateRunLimits(settings.runLimits).toolCalls+1) : 1, abortController: controller,
             settingSources: [], plugins: [], mcpServers: runtime?.mcpServers || {}, strictMcpConfig: true, hooks:claudeToolHooks(onMetadata),
             tools: runtime?.web ? ['WebSearch','WebFetch'] : [],
             allowedTools: runtime ? [...(runtime.web?['WebSearch','WebFetch']:[]),'mcp__gratis__*','mcp__composio__COMPOSIO_SEARCH_TOOLS','mcp__composio__COMPOSIO_GET_TOOL_SCHEMAS'] : [],

@@ -9,6 +9,10 @@ Gratis brings focused assistants, group conversations, local memory and recurrin
 
 ![Gratis Core with a synthetic research conversation](docs/screenshots/core-overview.png)
 
+## Reliability and recovery
+
+Configure run limits, preserve partial work, and create verified local checkpoints in Settings. See [limits and recovery](docs/RELIABILITY.md) for the exact behavior, storage limits and restore commands.
+
 ## What you can do
 
 - **Create focused assistants.** Name a bot, choose a geometric badge or your own photo, and describe its purpose. Adjust its instructions and model later.

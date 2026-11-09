@@ -1,3 +1,4 @@
+import {assertStorageCompatible} from './storage-safety.mjs';
 import {randomBytes,randomUUID,createCipheriv,createDecipheriv,createHmac} from 'node:crypto';
 import {mkdir,readFile,writeFile,rename,unlink} from 'node:fs/promises';
 import {join} from 'node:path';
@@ -11,16 +12,17 @@ const initial=()=>({version:1,enabled:true,revision:0,privacyRevision:0,facts:[]
 export class MemoryVault {
  constructor({directory,wrapKey,unwrapKey,now=()=>Date.now()}){this.directory=directory;this.wrapKey=wrapKey;this.unwrapKey=unwrapKey;this.now=now;this.tail=Promise.resolve();this.indexRevision=-1;}
  async init(){
-  await mkdir(this.directory,{recursive:true,mode:0o700});this.path=join(this.directory,'memory.secure');this.keyPath=join(this.directory,'memory-key.secure');
+  await assertStorageCompatible(this.directory);await mkdir(this.directory,{recursive:true,mode:0o700});this.path=join(this.directory,'memory.secure');this.keyPath=join(this.directory,'memory-key.secure');
   let wrapped;try{wrapped=await readFile(this.keyPath);}catch(e){if(e.code!=='ENOENT')throw e;}
-  if(wrapped){const decrypted=await this.unwrapKey(wrapped),text=typeof decrypted==='string'?decrypted:decrypted?.value;this.key=Buffer.from(text,'base64');if(this.key.length!==32)throw new Error('The memory key could not be opened.');if(decrypted?.rewrap)await this.atomic(this.keyPath,await this.wrapKey(text));}
+  if(wrapped){const decrypted=await this.unwrapKey(wrapped),text=typeof decrypted==='string'?decrypted:decrypted?.value;this.key=Buffer.from(text,'base64');if(this.key.length!==32)throw new Error('The memory key could not be opened.');if(decrypted?.rewrap)this.needsRewrap=text;}
   else {try{await readFile(this.path);throw new Error('The existing memory key is missing. The vault has been preserved.');}catch(e){if(e.code!=='ENOENT')throw e;}this.key=randomBytes(32);await this.atomic(this.keyPath,await this.wrapKey(this.key.toString('base64')));}
   try{const bytes=await readFile(this.path);if(bytes.subarray(0,4).toString()!=='GME1')throw new Error('format');const d=createDecipheriv('aes-256-gcm',this.key,bytes.subarray(4,16));d.setAuthTag(bytes.subarray(16,32));this.state=JSON.parse(Buffer.concat([d.update(bytes.subarray(32)),d.final()]).toString());if(this.state.version!==1||!Array.isArray(this.state.facts)||!Array.isArray(this.state.jobs)||!Array.isArray(this.state.forgotten))throw new Error('format');}
   catch(e){if(e.code!=='ENOENT')throw new Error('Memory could not be opened. Its encrypted files have been preserved.');this.state=initial();await this.persist();}
+  if(this.needsRewrap){await this.atomic(this.keyPath,await this.wrapKey(this.needsRewrap));delete this.needsRewrap;}
   this.db=new DatabaseSync(':memory:');this.db.exec('PRAGMA temp_store=MEMORY; CREATE VIRTUAL TABLE memory_search USING fts5(id UNINDEXED, body);');return this;
  }
  async atomic(path,bytes){const temp=path+'.'+randomUUID()+'.tmp';try{await writeFile(temp,bytes,{mode:0o600,flag:'wx'});await rename(temp,path);}finally{await unlink(temp).catch(()=>{});}}
- async persist(){const text=JSON.stringify(this.state);if(Buffer.byteLength(text)>64_000_000)throw new Error('Memory is full. Remove unused items before learning more.');const iv=randomBytes(12),c=createCipheriv('aes-256-gcm',this.key,iv),payload=Buffer.concat([c.update(text,'utf8'),c.final()]);await this.atomic(this.path,Buffer.concat([Buffer.from('GME1'),iv,c.getAuthTag(),payload]));}
+ async persist(){if(this.state?.version!==1)throw new Error('Memory version is unsupported. Existing files were preserved.');await assertStorageCompatible(this.directory);const text=JSON.stringify(this.state);if(Buffer.byteLength(text)>64_000_000)throw new Error('Memory is full. Remove unused items before learning more.');const iv=randomBytes(12),c=createCipheriv('aes-256-gcm',this.key,iv),payload=Buffer.concat([c.update(text,'utf8'),c.final()]);await this.atomic(this.path,Buffer.concat([Buffer.from('GME1'),iv,c.getAuthTag(),payload]));}
  mutate(fn){const job=this.tail.catch(()=>{}).then(async()=>{const before=structuredClone(this.state);try{const out=fn(this.state);this.state.revision++;await this.persist();return structuredClone(out);}catch(e){this.state=before;throw e;}});this.tail=job;return job;}
  snapshot(){return structuredClone(this.state);}
  allowed(context,row,seen=new Set()){if(!context.scopes.some(s=>s.type===row.scope&&s.id===row.scopeId)||seen.has(row.id))return false;if(!row.memoryRefs?.length)return true;seen.add(row.id);return row.memoryRefs.every(id=>{const dependency=this.state.facts.find(r=>r.id===id)||this.state.episodes.find(r=>r.id===id);return dependency&&this.allowed(context,dependency,new Set(seen));});}

@@ -1,7 +1,7 @@
 {
   "name": "gratis-core",
   "productName": "Gratis Core",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "Independent desktop assistants with local memory, scheduled tasks and optional connected apps",
   "type": "module",

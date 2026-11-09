@@ -18,7 +18,7 @@ export function createCodexReply({createClient,status=getCodexStatus,resolveExec
     const signature=digest({instructions,model:settings.model,effort:settings.effort,runtime:runtime?.signature,contextEpoch});
     const resume=codexSession?.signature===signature&&codexSession.historyHash===digest(messages.slice(0,-1))&&/^[a-f0-9-]{36}$/i.test(codexSession.id||'')?codexSession.id:null;
     const controller=new AbortController(),abort=()=>controller.abort(signal.reason);signal.addEventListener('abort',abort,{once:true});if(signal.aborted)abort();
-    let timedOut=false,bridge,output='',completed=false;const timer=setTimeout(()=>{timedOut=true;controller.abort();},timeoutMs);timer.unref?.();
+    let timedOut=false,bridge,output='',completed=false;const timer=setTimeout(()=>{timedOut=true;controller.abort();},settings.runLimits?settings.runLimits.minutes*60000:timeoutMs);timer.unref?.();
     try{
       bridge=runtime?await bridgeFactory(runtime):null;
       const env={...codexEnvironment(),...(bridge?{GRATIS_MCP_TOKEN:bridge.token}:{})};

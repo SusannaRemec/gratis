@@ -1,3 +1,4 @@
+import {requireVersion,assertStorageCompatible} from './storage-safety.mjs';
 import {mkdir,readFile,writeFile,rename} from 'node:fs/promises';
 import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
@@ -43,9 +44,9 @@ export function nextRun(timing,after,servedAt){
 }
 export class Schedules {
  constructor({directory,encrypt,decrypt,service,onChange=()=>{},now=Date.now}){Object.assign(this,{directory,encrypt,decrypt,service,onChange,now});this.items=[];this.persist=Promise.resolve();this.ticking=false;this.closed=false;this.dispatching=new Set();}
- async init(){try{const data=JSON.parse(this.decrypt(await readFile(join(this.directory,'schedules.secure'))));this.items=data.items||[];}catch(e){if(e.code!=='ENOENT')throw new Error('Could not unlock saved schedules.');}return this;}
+ async init(){try{const data=JSON.parse(this.decrypt(await readFile(join(this.directory,'schedules.secure'))));requireVersion(data,'Schedules');this.items=data.items||[];}catch(e){if(e.code!=='ENOENT')throw new Error('Could not unlock saved schedules.');}this.opened=true;return this;}
  snapshot(conversationId){return structuredClone(this.items.filter(i=>!conversationId||i.conversationId===conversationId));}
- async save(){const body=JSON.stringify({version:1,items:this.items});const write=async()=>{await mkdir(this.directory,{recursive:true,mode:0o700});const tmp=join(this.directory,'.schedules-'+randomUUID());await writeFile(tmp,this.encrypt(body),{mode:0o600});await rename(tmp,join(this.directory,'schedules.secure'));};this.persist=this.persist.then(write,write);await this.persist;this.onChange();}
+ async save(){if(!this.opened)throw new Error('Storage did not open safely. Existing files were preserved.');const body=JSON.stringify({version:1,items:this.items});const write=async()=>{await assertStorageCompatible(this.directory);await mkdir(this.directory,{recursive:true,mode:0o700});const tmp=join(this.directory,'.schedules-'+randomUUID());await writeFile(tmp,this.encrypt(body),{mode:0o600});await rename(tmp,join(this.directory,'schedules.secure'));};this.persist=this.persist.then(write,write);await this.persist;this.onChange();}
  get(id,conversationId){const item=this.items.find(i=>i.id===id&&i.conversationId===conversationId);if(!item)throw new Error('This schedule does not belong to this chat.');return item;}
  async create({conversationId,title,prompt,timing,sourceMessageId}){
   const c=this.service._conversation(conversationId);if(c.parentThreadId)throw new Error('Create schedules in the shared chat.');

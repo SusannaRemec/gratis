@@ -1,3 +1,5 @@
+import {validateRunLimits,createRunBudget,abortable,RunLimitError} from './run-limits.mjs';
+import {DiagnosticLog} from './diagnostic-log.mjs';
 import {TeamCoordinator} from './team-coordinator.mjs';
 import {continuationContext,computerObservation} from './computer-checkpoint.mjs';
 import { randomUUID, createHash } from 'node:crypto';
@@ -14,8 +16,8 @@ const text = (value, label, max, allowEmpty = false) => {
 };
 const id = value => text(value, 'ID', 100);
 export class ChatService {
-  constructor({ dataDir, onChange = () => {}, backend = streamReply, promptGenerator = generateBotPrompt, runtimeFactory, workspaceFiles, memory, onGroupMembersChanging=async()=>{} }) {
-    this.store = new JsonStore(dataDir); this.onChange = onChange; this.backend = backend; this.promptGenerator = promptGenerator; this.tasks = new Map(); this.promptTasks = new Map(); this.deletingBots = new Set(); this.deletingThreads=new Set();this.runtimeFactory = runtimeFactory; this.approvals = new Map(); this.closing = false; this.closed = false; this.computerPauseTasks = new Map(); this.teams=new TeamCoordinator(this);this.workspaceFiles=workspaceFiles;this.memory=memory;
+  constructor({ dataDir, onChange = () => {}, backend = streamReply, promptGenerator = generateBotPrompt, runtimeFactory, workspaceFiles, memory, onGroupMembersChanging=async()=>{}, runDurationMs }) {
+    this.store = new JsonStore(dataDir); this.diagnostics=new DiagnosticLog(dataDir);this.runDurationMs=runDurationMs; this.onChange = onChange; this.backend = backend; this.promptGenerator = promptGenerator; this.tasks = new Map(); this.promptTasks = new Map(); this.deletingBots = new Set(); this.deletingThreads=new Set();this.runtimeFactory = runtimeFactory; this.approvals = new Map(); this.closing = false; this.closed = false; this.computerPauseTasks = new Map(); this.teams=new TeamCoordinator(this);this.workspaceFiles=workspaceFiles;this.memory=memory;
     this.changingThreads=new Set();this.onGroupMembersChanging=onGroupMembersChanging;
   }
   async init() {
@@ -128,7 +130,7 @@ export class ChatService {
   async newConversation({ botId } = {}) { const b = this._bot(botId); this._newConversation(b.id); return this._changed(); }
   async selectConversation({ id: conversationId } = {}) { const c = this._conversation(conversationId); this._bot(c.botId); this.state.activeConversationId = c.id; this.state.activeBotId = c.botId; return this._changed(); }
   async setDraft({ conversationId, text: draft } = {}) { const c = this._conversation(conversationId); c.draft = text(draft, 'Draft', 100_000, true); return this._changed(); }
-  async updateSettings(value) { this._ready(); const old=this.state.settings;const next=validateSettings(value && { displayName:old.displayName,profileAvatarDataUrl:old.profileAvatarDataUrl,...value });next.providerDefaults={...old.providerDefaults,[old.provider]:{model:old.model,effort:old.effort},[next.provider]:{model:next.model,effort:next.effort}};this.state.settings=next;return this._changed(); }
+  async updateSettings(value) { this._ready(); const old=this.state.settings;const next=validateSettings(value && { displayName:old.displayName,profileAvatarDataUrl:old.profileAvatarDataUrl,runLimits:old.runLimits,...value });next.providerDefaults={...old.providerDefaults,[old.provider]:{model:old.model,effort:old.effort},[next.provider]:{model:next.model,effort:next.effort}};this.state.settings=next;return this._changed(); }
   async updateBot({ id: botId, name, instructions, userPromptTemplate, avatarDataUrl, avatarShape, avatarColor, capabilities, model, codexModel, pinned, memory, memoryProfileAccess } = {}) {
     const b = this._bot(botId), patch = {};
     if (name !== undefined) patch.name = text(name, 'Bot name', 255).trim();
@@ -219,7 +221,7 @@ export class ChatService {
     if(c.kind==='group'&&last?.botId&&last.botId!==c.botId&&last.kind!=='team-reply')throw new Error('Send a new message to the current group to continue this earlier reply.');
     if(last?.memoryBlocked)throw new Error('Send a new request after clearing this chat’s memory context.');
     if (!last || last.role !== 'assistant' || !['error', 'cancelled'].includes(last.status)) throw new Error('There is no failed or stopped response to retry.');
-    if(last.computerContinuation||c.kind==='group'||c.parentThreadId||last.activities?.some(a=>a.result||a.status==='complete')){
+    if(last.limitReached||last.content?.trim()||last.computerContinuation||c.kind==='group'||c.parentThreadId||last.activities?.some(a=>a.result||a.status==='complete')){
       return this._begin(c,{resumeMessage:last,continuation:continuationContext(last,last.computerContinuation,'retry')});
     }
     c.messages.pop(); return this._begin(c);
@@ -266,39 +268,46 @@ export class ChatService {
     const controller = new AbortController(), assistant = resumeMessage || { id: randomUUID(), role: 'assistant', content: '', status: 'streaming', createdAt: Date.now(), provider: this.state.settings.provider };
     const history = this.promptMessages(c).filter(m => m.kind !== 'onboarding' && (!continuation||m.id!==resumeMessage?.id) && (m.role === 'user' || (m.role === 'assistant' && m.status === 'complete'))).map(({ role, content, modelContent,botId }) => ({ role, content: role === 'user' ? modelContent ?? content : botId?'['+(this.state.bots.find(b=>b.id===botId)?.name||'Teammate')+'] '+content:content }));
     if(continuation){if(priorContent)history.push({role:'assistant',content:priorContent});history.push({role:'user',content:continuation,internalContinuation:true});}
-    assistant.status='streaming';assistant.provider=this.state.settings.provider;delete assistant.error;delete assistant.pauseReason;
+    const limits=validateRunLimits(this.state.settings.runLimits),budget=createRunBudget(controller,limits,{durationMs:this.runDurationMs});
+    assistant.runLimitWarning='This response pauses after '+limits.minutes+' minutes or '+limits.toolCalls+' tool calls. Partial work is retained.';
+    assistant.status='streaming';assistant.provider=this.state.settings.provider;delete assistant.error;delete assistant.pauseReason;delete assistant.limitReached;
     let bot = structuredClone(this._bot(c.botId)); const settings = {...structuredClone(this.state.settings),...(this.state.settings.provider==='claude'&&bot.model?{model:bot.model}:this.state.settings.provider==='codex'&&bot.codexModel?{model:bot.codexModel}:{})};
     if(!resumeMessage)c.messages.push(assistant); c.updatedAt = Date.now();
     const task = { controller, promise: null, assistantId:assistant.id }; task.ready = new Promise(resolve => { task.started = resolve; }); this.tasks.set(c.id, task);
     try { await this._changed(); }
-    catch (error) { this.tasks.delete(c.id); task.started(); assistant.status = 'error'; assistant.error = error.message; throw error; }
+    catch (error) { budget.close();this.tasks.delete(c.id); task.started(); assistant.status = 'error'; assistant.error = error.message; throw error; }
     let broadcast;const respondAll=()=>{if(!resumeMessage&&!broadcast&&c.kind==='group'&&!c.parentThreadId&&!controller.signal.aborted)broadcast=this.teams.respondSelected(c,assistant,controller.signal);};
     task.promise = (async () => {
+      void this.diagnostics.record({event:"run-start",provider:settings.provider});
       try {
         controller.signal.throwIfAborted();
         const workspaceDir = join(this.store.directory, 'claude-workspaces', createHash('sha256').update(c.id).digest('hex'));
         if (bot.promptMode === 'auto' && !bot.promptGenerated) {
           assistant.phase='setup'; await this._changed();
           const firstUser=this.promptMessages(c).find(m=>m.role==='user');
-          await this._prepareBotPrompt(this._bot(c.botId),firstUser?.setupIntention||firstUser?.content||'',settings,workspaceDir,controller.signal,firstUser?.setupSource||{conversationId:c.id,messageId:firstUser?.id});
+          await abortable(this._prepareBotPrompt(this._bot(c.botId),firstUser?.setupIntention||firstUser?.content||'',settings,workspaceDir,controller.signal,firstUser?.setupSource||{conversationId:c.id,messageId:firstUser?.id}),controller.signal);
           bot=structuredClone(this._bot(c.botId));delete assistant.phase;await this._changed();
         }
-        const onActivity = activity => {const entries=assistant.activities??=[];let current=entries.find(a=>a.id===activity.id);if(current)Object.assign(current,activity);else if(activity.name)entries.push(activity);else return;if((activity.name||current?.name)==='recall_memory'&&activity.result?.ids)assistant.memoryRefs=[...new Set([...(assistant.memoryRefs||[]),...activity.result.ids])];void this._changed().catch(()=>{});};
+        const onActivity = activity => {if(controller.signal.aborted)return;budget.activity(activity);const entries=assistant.activities??=[];let current=entries.find(a=>a.id===activity.id);if(current)Object.assign(current,activity);else if(activity.name){if(entries.length>=200){const at=entries.findIndex(a=>!["running","approval"].includes(a.status));if(at>=0)entries.splice(at,1);assistant.activityHistoryTrimmed=true;}entries.push(activity);}else return;if((activity.name||current?.name)==='recall_memory'&&activity.result?.ids)assistant.memoryRefs=[...new Set([...(assistant.memoryRefs||[]),...activity.result.ids])];void this._changed().catch(()=>{});};
         await this.memory?.checkpoint(c,assistant,'working');
-        const memoryPacket=this.memory?await this.memory.contextPacket(c.id,history.findLast(m=>m.role==='user')?.content||''):{context:'',ids:[]};assistant.memoryRefs=memoryPacket.ids;
+        const memoryPacket=this.memory?await abortable(this.memory.contextPacket(c.id,history.findLast(m=>m.role==='user')?.content||''),controller.signal):{context:'',ids:[]};assistant.memoryRefs=memoryPacket.ids;
         if(memoryPacket.ids.length)onActivity({id:'memory-'+assistant.id,name:'recall_memory',status:'complete',startedAt:Date.now(),finishedAt:Date.now(),result:{count:memoryPacket.ids.length,ids:memoryPacket.ids},input:{automatic:true}});
         const memoryTools=this.memory?{recall:input=>this.memory.search(c.id,input),learn:input=>this.memory.learn(c.id,{...input,messageId:this.promptMessages(c).findLast(m=>m.role==='user')?.id})}:undefined;
-        const runtime=this.runtimeFactory&&['claude','codex'].includes(settings.provider)?await this.runtimeFactory({bot,conversationId:c.id,sourceMessageId:this.promptMessages(c).findLast(m=>m.role==='user')?.id,signal:controller.signal,onActivity,memory:memoryTools,collaboration:this.teams.forConversation(c,bot,controller.signal),requestComputerHelp:input=>this.requestComputerHelp(c,assistant,input,controller.signal),approve:(name,input)=>this._approve(assistant,name,input,controller.signal)}):undefined;
-        const onMetadata = value => { if(value.codexSession!==undefined)c.codexSession=value.codexSession; if (value.claudeSession !== undefined) c.claudeSession = value.claudeSession; if (value.usage) assistant.usage = value.usage; if(value.activity)onActivity(value.activity); };
+        const runtime=this.runtimeFactory&&['claude','codex'].includes(settings.provider)?await abortable(this.runtimeFactory({bot,conversationId:c.id,sourceMessageId:this.promptMessages(c).findLast(m=>m.role==='user')?.id,signal:controller.signal,onActivity,memory:memoryTools,collaboration:this.teams.forConversation(c,bot,controller.signal),requestComputerHelp:input=>this.requestComputerHelp(c,assistant,input,controller.signal),approve:(name,input)=>this._approve(assistant,name,input,controller.signal)}),controller.signal):undefined;
+        const onMetadata = value => { if(controller.signal.aborted)return; if(value.codexSession!==undefined)c.codexSession=value.codexSession; if (value.claudeSession !== undefined) c.claudeSession = value.claudeSession; if (value.usage) assistant.usage = value.usage; if(value.activity)onActivity(value.activity); };
         let continuationStarted=false;
-        for await (const chunk of this.backend({ settings, bot, messages: history, signal: controller.signal, workspaceDir, claudeSession: c.claudeSession, codexSession:c.codexSession, onMetadata, runtime,turnContext:memoryPacket.context,contextEpoch:memoryPacket.epoch })) {
+        const stream=this.backend({ settings, bot, messages: history, signal: controller.signal, workspaceDir, claudeSession: c.claudeSession, codexSession:c.codexSession, onMetadata, runtime,turnContext:memoryPacket.context,contextEpoch:memoryPacket.epoch });
+        const iterator=stream[Symbol.asyncIterator]();
+        try { while(true){
+          const next=await abortable(iterator.next(),controller.signal);if(next.done)break;const chunk=next.value;
           if (controller.signal.aborted) throw controller.signal.reason;
           if (typeof chunk !== 'string') throw new Error('Backend returned a non-text response chunk.');
           if(resumeMessage&&priorContent&&!continuationStarted&&chunk){assistant.content+='\n\n';continuationStarted=true;}
           assistant.content += chunk;if(chunk)respondAll();
-          if (assistant.content.length > 1_000_000) throw new Error('Response exceeded the local size limit.');
+          if (assistant.content.length > limits.outputCharacters){assistant.content=assistant.content.slice(0,limits.outputCharacters);budget.stop('Paused at the response size limit.');controller.signal.throwIfAborted();}
           await this._changed();
         }
+        } finally {if(controller.signal.aborted)void Promise.resolve(iterator.return?.()).catch(()=>{});}
         if (controller.signal.aborted) throw controller.signal.reason;
         if (!assistant.content) throw new Error('Backend returned an empty response.');
         assistant.status = 'complete';
@@ -306,9 +315,11 @@ export class ChatService {
       } catch (error) {
         if (settings.provider === 'claude') c.claudeSession = null; if(settings.provider==='codex')c.codexSession=null;
         assistant.status = controller.signal.aborted ? 'cancelled' : 'error';
-        assistant.error = controller.signal.aborted ? 'Response stopped.' : String(error?.message ?? error);
+        assistant.limitReached=controller.signal.reason instanceof RunLimitError;
+        assistant.error = assistant.limitReached ? controller.signal.reason.message : controller.signal.aborted ? 'Response stopped.' : String(error?.message ?? error);
       } finally {
-        respondAll();if(broadcast&&!(controller.signal.aborted&&c.computerPause))await broadcast;
+        budget.close();void this.diagnostics.record({event:"run-end",provider:settings.provider,status:assistant.status,reason:assistant.limitReached?"limit":controller.signal.aborted?"user":assistant.status==="error"?"provider":undefined});
+        if(!controller.signal.aborted)respondAll();if(broadcast&&!(controller.signal.aborted&&c.computerPause))await broadcast;
         for(const activity of assistant.activities||[])if(activity.status==='running'||activity.status==='approval')activity.status='cancelled';
         c.updatedAt = Date.now(); this.tasks.delete(c.id);
         if(assistant.status!=='complete'&&c.queue?.length)c.queuePaused=true;
@@ -332,6 +343,6 @@ export class ChatService {
     if (task) { await task.ready; await task.promise; }
     return this._changed();
   }
-  async whenIdle() { while(this.tasks.size)await Promise.all([...this.tasks.values()].map(async t => { await t.ready; await t.promise; })); await this.store.flush(); }
+  async whenIdle() { while(this.tasks.size)await Promise.all([...this.tasks.values()].map(async t => { await t.ready; await t.promise; })); await this.store.flush(); await this.diagnostics.flush(); }
   async close() { this.closing=true; for (const task of this.tasks.values()) task.controller.abort(new DOMException('App closed', 'AbortError')); await this.whenIdle(); await this.memory?.close();this.closed = true; }
 }

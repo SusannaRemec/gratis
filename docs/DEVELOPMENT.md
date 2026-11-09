@@ -11,7 +11,7 @@ npm run test:desktop
 
 `npm run verify:public` checks tracked files for accidental runtime data, unsupported bundled assets and obvious secret/path patterns. Run a dedicated secret scanner before publication as well; neither check proves the absence of every kind of sensitive information.
 
-On macOS Apple Silicon, build a local unsigned app with:
+On macOS Apple Silicon, build a local ad-hoc signed app with:
 
 ```sh
 npm run setup:assets
@@ -36,3 +36,5 @@ npx vitest run
 ```
 
 These checks generate local type declarations and use test doubles. Deploy only to an account you control, after configuring the authentication secrets and reviewing expected costs.
+
+The Mac packaging command signs nested code and seals the final bundle, then verifies it. This is ad-hoc integrity signing, not Developer ID signing or notarization. The app may still require explicit macOS approval. Existing `dist`/`release` output is excluded from the package. Settings shows the exact build identity for bug reports.

@@ -1,7 +1,7 @@
 {
   "name": "gratis-core",
   "productName": "Gratis Core",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Independent desktop assistants with local memory, scheduled tasks and optional connected apps",
   "type": "module",
@@ -17,6 +17,7 @@
     "check": "npm run verify:public && npm test"
   },
   "devDependencies": {
+    "@electron/osx-sign": "2.7.2",
     "@electron/packager": "^20.3.0",
     "@playwright/test": "^1.65.0",
     "electron": "42.11.16"

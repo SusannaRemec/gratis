@@ -107,7 +107,7 @@ app.whenReady().then(async () => {
     }else if(!priorFullscreen)window.setFullScreen(enabled);
     window.webContents.send('orbit:workspace-fullscreen',enabled);return enabled;
   }
-  ipcMain.handle('orbit:edition',e=>{authorized(e);return {id:edition.id,name:edition.name};});
+  ipcMain.handle('orbit:edition',e=>{authorized(e);return {id:edition.id,name:edition.name,version:app.getVersion(),platform:process.platform,arch:process.arch};});
   ipcMain.handle('orbit:workspace-fullscreen',(e,enabled)=>{authorized(e);if(typeof enabled!=='boolean')throw new Error('Invalid fullscreen mode.');return setWorkspaceFullscreen(enabled);});
   window.webContents.on('before-input-event',(event,input)=>{if(workspaceFullscreen&&input.type==='keyDown'&&['Escape','Esc'].includes(input.key)){event.preventDefault();setWorkspaceFullscreen(false);}});
   window.on('close', e => { e.preventDefault(); if(schedules.items.some(i=>i.enabled)){window.hide();}else void shutdown(); });

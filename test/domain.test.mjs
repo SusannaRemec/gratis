@@ -68,10 +68,11 @@ test('backend errors are persisted, retry does not duplicate user message', asyn
   assert.equal(messages.at(-1).status, 'complete');
 });
 
-test('stopping a stream retains partial response and permits retry', async t => {
-  const backend = async function* ({ signal }) { yield 'Partial'; await delay(5000, undefined, { signal }); yield ' later'; };
+test('stopping a stream retains partial response and permits retry', {timeout:5000}, async t => {
+  let received;const firstChunk=new Promise(resolve=>{received=resolve;});
+  const backend = async function* ({ signal }) { yield 'Partial'; received(); await delay(5000, undefined, { signal }); yield ' later'; };
   const { service } = await fixture(t, backend), conversationId = service.snapshot().activeConversationId;
-  await service.send({ conversationId, text: 'Stop this' }); await delay(20);
+  await service.send({ conversationId, text: 'Stop this' }); await firstChunk;
   await service.stop({ conversationId });
   const response = service.snapshot().conversations[0].messages.at(-1);
   assert.equal(response.content, 'Partial'); assert.equal(response.status, 'cancelled');

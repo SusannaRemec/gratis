@@ -37,4 +37,11 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm run test:ui
+      - run: node --test test/mac-signing.test.mjs
+      - run: npm run setup:assets
+      - run: npm run package:mac
+      - name: Verify packaged identity and desktop regressions
+        run: |
+          export GRATIS_TEST_APP="$PWD/release/Gratis Core-darwin-$(node -p process.arch)/Gratis Core.app/Contents/MacOS/Gratis Core"
+          node test/package-edition.mjs
+          npm run test:ui

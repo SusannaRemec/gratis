@@ -40,3 +40,5 @@ These checks generate local type declarations and use test doubles. Deploy only 
 The Mac packaging command signs nested code and seals the final bundle, then verifies it. This is ad-hoc integrity signing, not Developer ID signing or notarization. The app may still require explicit macOS approval. Existing `dist`/`release` output is excluded from the package. Settings shows the exact build identity for bug reports.
 
 GUI tests use a shared launcher that requires a profile under the system temporary directory and passes Chromium’s mock-keychain flag on macOS. They must not access the installed app’s login-keychain item. Production encryption is unchanged; mock-keychain tests do not establish real Keychain permission or notarization behavior.
+
+Linux GUI tests require an unlocked Secret Service. Release CI creates a disposable keyring inside its own D-Bus session and verifies it before launching the app; it does not enable the plaintext storage fallback.

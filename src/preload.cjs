@@ -47,4 +47,6 @@ for(const name of ['view','connect','local','options','threads','project','bind'
 api.onT3Changed=cb=>{const listener=()=>cb();ipcRenderer.on('orbit:t3-changed',listener);return()=>ipcRenderer.removeListener('orbit:t3-changed',listener);};
 for(const name of ['view','create','update','remove','run'])api['schedules'+name[0].toUpperCase()+name.slice(1)]=value=>invoke('orbit:schedules-'+name,value);
 api.onSchedulesChanged=cb=>{const listener=()=>cb();ipcRenderer.on('orbit:schedules-changed',listener);return()=>ipcRenderer.removeListener('orbit:schedules-changed',listener);};
+for(const name of ['status','manifest','configure','link','channels','disconnect','review'])api['slack'+name[0].toUpperCase()+name.slice(1)]=value=>invoke('orbit:slack-'+name,value);
+api.onSlackChanged=cb=>{const listener=()=>cb();ipcRenderer.on('orbit:slack-changed',listener);return()=>ipcRenderer.removeListener('orbit:slack-changed',listener);};
 contextBridge.exposeInMainWorld('orbit', api);

@@ -5,6 +5,7 @@ npm ci
 npm run check
 npm run setup:assets
 npm run test:desktop
+node test/slack-desktop.mjs
 ```
 
 `npm test` uses isolated temporary workspaces and mocked providers. It must not contact real mailboxes or spend provider usage. The desktop smoke test uses synthetic conversations, demonstrates key controls, and produces the documentation screenshots. It never opens your personal app profile.

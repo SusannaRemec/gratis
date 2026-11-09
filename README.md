@@ -19,6 +19,7 @@ Configure run limits, preserve partial work, and create verified local checkpoin
 - **Work as a group.** The primary bot uses judgment about when to involve a specialist. Type `@` to address a teammate, or `@everyone` for all perspectives.
 - **Keep useful context.** Inspect and manage memories scoped to you, a bot or a conversation.
 - **Schedule recurring checks.** Create daily, weekday, weekly or interval tasks. Results return to the same chat.
+- **Chat from Slack.** Link your own Slack account to an existing assistant, with explicit channel permissions. Follow the [Slack setup guide](docs/SLACK.md).
 - **Connect your apps.** Optional Composio integration lets you authorize services individually.
 - **Use a separate computer.** An optional self-hosted cloud browser supports live viewing, manual takeover and resuming after your changes.
 - **Delegate project work.** Connect your own T3 environment for work that continues independently of the desktop window.

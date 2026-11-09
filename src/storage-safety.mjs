@@ -3,7 +3,7 @@ import {join,basename} from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 export const STORAGE_VERSION=1;
 // Credentials remain encrypted; a checkpoint is local recovery, not a portable export.
-export const CHECKPOINT_FILES=Object.freeze(['workspace.json','memory.secure','memory-key.secure','connections.secure','schedules.secure','t3-tasks.secure','t3-connection.secure','storage-format.json']);
+export const CHECKPOINT_FILES=Object.freeze(['workspace.json','messaging.secure','memory.secure','memory-key.secure','connections.secure','schedules.secure','t3-tasks.secure','t3-connection.secure','storage-format.json']);
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 export function requireVersion(value,label='Saved data'){
  if(!value||value.version!==1)throw new Error(`${label} has an unsupported version. Use a compatible Gratis release; existing files were preserved.`);

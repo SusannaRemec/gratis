@@ -1,0 +1,8 @@
+#slack-dialog{width:580px;max-width:calc(100vw - 40px)}
+#slack-channel-list{max-height:160px;overflow:auto}
+#slack-dialog #slack-channel-list label,#slack-dialog .slack-check{display:flex;gap:10px;align-items:center;font-weight:400}
+#slack-dialog .slack-check input,#slack-dialog #slack-channel-list input{width:18px;flex:none;margin:0;padding:0}
+#slack-code{padding:12px;border:1px solid var(--line);border-radius:12px;font-family:monospace;overflow-wrap:anywhere}
+#slack-error{color:#ee8b8b}
+#slack-dialog .dialog-body>button{margin:5px 5px 5px 0}
+#slack-channel-list{margin:10px 0}

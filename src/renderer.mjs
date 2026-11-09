@@ -1,3 +1,4 @@
+import {setupMessaging} from './messaging-ui.mjs';
 import {DEFAULT_RUN_LIMITS} from './run-limits.mjs';
 import {reconcileChildren} from './ui-dom.mjs';
 import {setupMentions} from './mentions-ui.mjs';
@@ -450,6 +451,7 @@ $('dropzone').ondrop = e => { e.preventDefault(); $('dropzone').classList.remove
 $('avatar-dialog').addEventListener('paste', e => { if (e.target.matches('input,textarea')) return; const item = [...e.clipboardData.items].find(x => x.type.startsWith('image/')); if (item) { e.preventDefault(); fromFile(item.getAsFile()); } });
 $('avatar-dialog').addEventListener('close', () => { imageSequence++; pointer = null; });
 workspaceUI=setupWorkspace({api,getState:()=>state,run,avatar:bot=>makeAvatar(bot,false,'workspace'),onOpenSource:id=>navigate(()=>api.selectConversation({id}))});
+setupMessaging({api,getState:()=>state});
 selects.refresh();
 threadUI=setupThreads({api,getState:()=>state,navigate,avatar:(bot,location='thread')=>makeAvatar(bot,false,location),onCreated:render,onDeleted:render,beforeDelete:async conversationId=>{if(conversationId===state.activeConversationId){voiceInput?.cancel();selects.close();}await flushDraft();},beforeCompose:async()=>{voiceInput?.cancel();selects.close();await flushDraft();return workspaceUI.beforeNavigate();},onModeChange:()=>{homeVisible=false;updateView();refreshComposer();},onError:notice});
 setupMentions({getState:()=>state});

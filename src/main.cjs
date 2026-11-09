@@ -16,6 +16,7 @@ const humanComputers=new Set(),computerControlEpochs=new Map(),computerControlRe
 function setHumanControl(id,human){if(humanComputers.has(id)!==human){human?humanComputers.add(id):humanComputers.delete(id);computerControlRevisions.set(id,(computerControlRevisions.get(id)||0)+1);}}
 const controlState=value=>({...value,control:humanComputers.has(value.conversationId)?'human':'bot',controlRevision:computerControlRevisions.get(value.conversationId)||0});
 const computerSnapshot=id=>{const snapshot=cloud.snapshot(id);return {...snapshot,state:controlState(snapshot.state)};};
+let messaging,messagingStartupError;
 let releaseDataLock, window, service, connections, files, cloud, signIn, memory, t3Connection, t3Tasks, t3Host, schedules, closing = false, finishDraftFlush, voiceTask;
 app.on('activate',()=>{if(window&&!window.isDestroyed()){window.show();window.focus();}});
 app.on('second-instance', () => { if (window && !window.isDestroyed()) { window.show(); window.focus(); } });
@@ -31,7 +32,7 @@ async function shutdown() {
   }
   const activeVoice = voiceTask;
   activeVoice?.controller.abort(new DOMException('App closed', 'AbortError'));
-  try { await activeVoice?.promise?.catch(() => {}); await signIn?.cancel({preserve:true}); await schedules?.close(); await t3Tasks?.close(); await t3Connection?.close(); await service?.close(); await cloud?.close(); } finally { await releaseDataLock?.(); app.exit(0); }
+  try { await messaging?.close(); await activeVoice?.promise?.catch(() => {}); await signIn?.cancel({preserve:true}); await schedules?.close(); await t3Tasks?.close(); await t3Connection?.close(); await service?.close(); await cloud?.close(); } finally { await releaseDataLock?.(); app.exit(0); }
 }
 const actions = ['createBot', 'deleteBot', 'selectBot', 'newConversation', 'selectConversation', 'setDraft',
   'createThread','renameThread','updateThreadMembers','pinThread','deleteThread','updateSettings', 'updateBot', 'duplicateBot', 'respondApproval', 'updateQueue', 'send', 'stop', 'retry'];
@@ -40,6 +41,7 @@ function authorized(event) {
     throw new Error('Unknown renderer');
 }
 function broadcast(snapshot) {
+  void messaging?.changed().catch(()=>{});
   if (window && !window.isDestroyed()) window.webContents.send('orbit:state', snapshot);
 }
 app.whenReady().then(async () => {
@@ -80,13 +82,14 @@ app.whenReady().then(async () => {
         ...retained.map(async seat=>{if(connections.status().cloud&&(humanComputers.has(seat.conversationId)||cloud.serverOwners.get(seat.conversationId))){await cloud.whenIdle(seat.conversationId);await cloud.control(seat.botId,seat.conversationId,false);}setHumanControl(seat.conversationId,false);if(window&&!window.isDestroyed())window.webContents.send('orbit:computer-state',computerSnapshot(seat.conversationId).state);}),
       ]);
       if(results.some(r=>r.status==='rejected'))throw new Error('Could not finish stopping a group computer. Your member changes have not been saved. Try again.');
-    },runtimeFactory:args=>agentRuntime({...args,files,cloud,connections,canUseComputer:()=>!humanComputers.has(args.conversationId),t3:t3Agent(args),schedules:scheduleAgent(args)}) });
+    },runtimeFactory:args=>agentRuntime({...args,files,cloud,connections,canUseComputer:()=>!humanComputers.has(args.conversationId),t3:service._conversation(args.conversationId).messaging&&!service._conversation(args.conversationId).messaging.allowTools?undefined:t3Agent(args),schedules:service._conversation(args.conversationId).messaging&&!service._conversation(args.conversationId).messaging.allowTools?undefined:scheduleAgent(args)}) });
   await service.init();
   await (await import('./edition-setup.mjs')).applyEdition(service,edition);
   const {Schedules}=await import('./schedules.mjs');
   schedules=await new Schedules({directory:dataDir,encrypt:connections.encrypt,decrypt:connections.decrypt,service,onChange:()=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:schedules-changed');}}).init();
   schedules.start();
   t3Tasks.start();
+  try{const {MessagingRouter}=await import('./messaging-router.mjs');messaging=await new MessagingRouter({directory:dataDir,encrypt:connections.encrypt,decrypt:connections.decrypt,service,onChange:()=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:slack-changed');}}).init();}catch{messagingStartupError='Saved Slack settings could not be opened. Existing data was preserved.';}
   for(const c of service.snapshot().conversations)if(c.computerPause)setHumanControl(c.id,true);
   if (app.isPackaged && !dataOverride) {
     const primary = service.snapshot().bots[0];
@@ -120,7 +123,7 @@ app.whenReady().then(async () => {
   window.webContents.session.webRequest.onBeforeRequest((details, cb) => {
     cb({ cancel: !['file:', 'data:', 'devtools:'].some(p => details.url.startsWith(p)) });
   });
-  ipcMain.handle('orbit:recovery-checkpoint',async e=>{authorized(e);if(service.tasks.size)throw new Error('Stop active responses before creating a recovery checkpoint.');await service.store.flush();await memory.vault.tail;await schedules.persist;await t3Tasks.persist;const checkpoint=await safety.createCheckpoint(dataDir);return checkpoint;});
+  ipcMain.handle('orbit:recovery-checkpoint',async e=>{authorized(e);if(service.tasks.size)throw new Error('Stop active responses before creating a recovery checkpoint.');await service.store.flush();await memory.vault.tail;await schedules.persist;await t3Tasks.persist;await messaging?.store.close();const checkpoint=await safety.createCheckpoint(dataDir);return checkpoint;});
   ipcMain.handle('orbit:recovery-folder',async e=>{authorized(e);const directory=path.join(dataDir,'checkpoints');await fs.mkdir(directory,{recursive:true,mode:0o700});await shell.openPath(directory);return true;});
   ipcMain.handle('orbit:snapshot', e => { authorized(e); return service.snapshot(); });
   ipcMain.handle('orbit:open-external', async (e,value) => {authorized(e);const url=new URL(value);if(!['https:','http:'].includes(url.protocol)||url.username||url.password)throw new Error('Only web links can be opened.');await shell.openExternal(url.href);});
@@ -159,6 +162,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('orbit:signin-state', e=>{authorized(e);return signIn.state();});
   ipcMain.handle('orbit:signin-cancel', e=>{authorized(e);return signIn.cancel();});
   ipcMain.handle('orbit:signin-open', e=>{authorized(e);return signIn.reopen();});
+  const {SLACK_MANIFEST}=await import('./slack-transport.mjs');
+  for(const [name,operation]of Object.entries({status:()=>messaging?messaging.status():{connected:false,state:messagingStartupError},manifest:()=>SLACK_MANIFEST,configure:value=>messaging.configure(value),link:()=>messaging.linkCode(),channels:()=>messaging.channels(),disconnect:()=>messaging.disconnect(),review:()=>messaging.reviewDeliveries()}))ipcMain.handle('orbit:slack-'+name,(e,value)=>{authorized(e);if(!messaging&&name!=='status'&&name!=='manifest')throw Error(messagingStartupError);return operation(value);});
   ipcMain.handle('orbit:connections', async e => {authorized(e);return connections.status();});
   ipcMain.handle('orbit:configure-connections', async (e,value) => {authorized(e);return connections.configure(value);});
   ipcMain.handle('orbit:connection-catalog', async (e,search) => {authorized(e);return connections.catalog(search);});

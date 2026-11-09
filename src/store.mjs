@@ -44,6 +44,7 @@ export function validState(s) {
     if(c.parentThreadId!==undefined&&!s.conversations.some(root=>root.id===c.parentThreadId&&(c.inactiveTeamMember===true||root.participantIds?.includes(c.botId))))return false;
     conversations.add(c.id);
     const ids = new Set();
+    if(c.messaging!==undefined&&(!c.messaging||Object.keys(c.messaging).some(k=>!['connectionId','direct','personalMemory','allowTools'].includes(k))||typeof c.messaging.connectionId!=='string'||['direct','personalMemory','allowTools'].some(k=>typeof c.messaging[k]!=='boolean')||!c.messaging.direct&&(c.messaging.personalMemory||c.messaging.allowTools)))return false;
     for (const m of c.messages) {
       if (!m || typeof m.id !== 'string' || ids.has(m.id) || !['user', 'assistant'].includes(m.role) || typeof m.content !== 'string' || !['complete', 'streaming', 'error', 'cancelled'].includes(m.status) || !Number.isFinite(m.createdAt)) return false;
       ids.add(m.id);

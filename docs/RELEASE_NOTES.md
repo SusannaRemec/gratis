@@ -1,9 +1,7 @@
-# Gratis Core 0.4.2 preview
+# Gratis Core 0.4.3 preview
 
-- Fixed footer Cancel and Close button sizing without changing the compact header ×.
-- Added one shared asynchronous secure-storage unlock path. A denied unlock stops automatic further attempts; retry is explicit.
-- Kept compatibility with existing encrypted connections and memory keys, with rollback-readability tests.
-- Added optional owner-linked Slack messaging, including explicit channel permissions, encrypted tokens, durable replies and request controls.
+- New profiles start with two more bots next to Gratis: **dr eggbot**, which designs tight single-job bots for you to paste in, and **tinkabot**, which wraps an API into a Cursor/Agent plugin and proves it locally before anything is published. Both are ported from Lauren Tan's Grok Bot Marketplace bots.
+- Existing profiles are unchanged. Starter bots are added only to a brand-new profile.
 
 These downloads contain the public core only. Phone pairing, shared human team spaces and Pages remain outside this edition.
 

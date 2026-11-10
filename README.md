@@ -26,12 +26,12 @@ Configure run limits, preserve partial work, and create verified local checkpoin
 
 ## Download and install
 
-Download [Gratis Core 0.4.2](https://github.com/promptadvisers/gratis/releases/tag/v0.4.2), including the Keychain and Cancel/Close fixes. Expand **Assets** and choose:
+Download [Gratis Core 0.4.3](https://github.com/SusannaRemec/gratis/releases/tag/v0.4.3), with the dr eggbot and tinkabot starter bots. Expand **Assets** and choose:
 
 | Mac | Installer |
 | --- | --- |
-| Apple Silicon | `Gratis-Core-0.4.2-mac-arm64.dmg` |
-| Intel | `Gratis-Core-0.4.2-mac-x64.dmg` |
+| Apple Silicon | `Gratis-Core-0.4.3-mac-arm64.dmg` |
+| Intel | `Gratis-Core-0.4.3-mac-x64.dmg` |
 
 Open the DMG, then drag **Gratis Core** into **Applications**. Close the app before replacing an older copy. The installer does not reset its data folder. GitHub’s **Source code** ZIP is not an app installer.
 

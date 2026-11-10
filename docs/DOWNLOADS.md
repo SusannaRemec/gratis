@@ -1,6 +1,6 @@
 # Downloads
 
-[Gratis Core 0.4.2 preview](https://github.com/promptadvisers/gratis/releases/tag/v0.4.2) contains the Keychain and button fixes. Choose the .dmg matching your Mac: arm64 for Apple Silicon, x64 for Intel. The source archives are for developers.
+[Gratis Core 0.4.3 preview](https://github.com/SusannaRemec/gratis/releases/tag/v0.4.3) adds the dr eggbot and tinkabot starter bots. Choose the .dmg matching your Mac: arm64 for Apple Silicon, x64 for Intel. The source archives are for developers.
 
 Open the DMG and drag Gratis Core into Applications. Quit the previous app before replacing it. Your local Gratis Core data folder is separate from the application bundle and is retained when replacing the app.
 

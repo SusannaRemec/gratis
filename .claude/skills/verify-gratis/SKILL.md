@@ -32,7 +32,7 @@ The window is visible by default because screenshots need a real window. Set `VE
 
 The app takes a single-instance lock and `recovery.lock` per data folder, so parallel runs with different profiles do not collide. Never set two runs to the same profile.
 
-Journeys today: `chat`, `create-bot`, `create-first-bot`, `schedules`. To add one, add a function to `journeys` in `scripts/run.mjs`. A journey that needs a starting `workspace.json` adds a builder to `seeds` in the same file. It receives `{app, page, capture, step, workspace, profile, evidence}`. For ad-hoc exploration, import `withApp` from `scripts/lib.mjs` in a scratch script outside the repo and pass it your own journey function.
+Journeys today: `chat`, `create-bot`, `create-first-bot`, `schedules`. To add one, add a function to `journeys` in `scripts/run.mjs`. It receives `{app, page, capture, step, workspace, profile, evidence}`. A journey that needs a starting `workspace.json` adds a builder to `seeds` in the same file. For ad-hoc exploration, import `withApp` from `scripts/lib.mjs` in a scratch script outside the repo and pass it your own journey function.
 
 ## Doctor
 

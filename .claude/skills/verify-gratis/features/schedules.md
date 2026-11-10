@@ -12,7 +12,6 @@ A user saves a recurring task for a chat from the composer's plus menu. The task
 ## How to get to it (user POV)
 
 - Open a chat, click the composer's plus button (`#attach-menu`), and choose the "Scheduled tasks" menu item.
-- Open a chat and click `Tasks` in the top bar (`#workspace-schedules`). Not yet scripted.
 
 ## Driving it with verify-gratis
 

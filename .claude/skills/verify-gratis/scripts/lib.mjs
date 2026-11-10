@@ -32,7 +32,6 @@ export async function withApp(name,{seed}={},journey){
   };
   const workspace=async()=>JSON.parse(await readFile(path.join(profile,'workspace.json'),'utf8'));
   result=await journey({app,page,capture,step,workspace,profile,evidence});
-  await copyFile(path.join(profile,'workspace.json'),path.join(evidence,'workspace.json')).catch(()=>{});
   if(rendererErrors.length)throw new Error('Renderer errors: '+rendererErrors.join(' | '));
   step('passed',result);
   return {passed:true,evidence,result};
@@ -40,7 +39,8 @@ export async function withApp(name,{seed}={},journey){
   step('failed',String(error?.stack||error));
   throw Object.assign(error,{evidence});
  }finally{
-  await writeFile(path.join(evidence,'log.json'),JSON.stringify({journey:name,rendererErrors,log},null,1));
+  await copyFile(path.join(profile,'workspace.json'),path.join(evidence,'workspace.json')).catch(()=>{});
+  await writeFile(path.join(evidence,'log.json'),JSON.stringify({journey:name,rendererErrors,log},null,1)).catch(e=>console.error(`could not write log.json: ${e.message}`));
   await app?.close().catch(()=>{});
   await rm(profile,{recursive:true,force:true});
  }

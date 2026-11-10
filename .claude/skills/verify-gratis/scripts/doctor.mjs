@@ -4,7 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {createRequire} from 'node:module';
-import {repoRoot,profilePrefix} from './lib.mjs';
+import {repoRoot,profilePrefix} from './paths.mjs';
 
 const require=createRequire(path.join(repoRoot,'package.json'));
 const checks=[];

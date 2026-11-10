@@ -1,13 +1,9 @@
 import {_electron as electron} from '@playwright/test';
 import {fixtureOptions} from '../../../../test/electron-fixture.mjs';
 import {mkdtemp,mkdir,writeFile,readFile,copyFile,rm} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
-
-export const repoRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../../..');
-export const profilePrefix=path.join(tmpdir(),'gratis-verify-profile-');
-export const evidenceRoot=path.join(tmpdir(),'gratis-verify-evidence');
+import {repoRoot,profilePrefix,evidenceRoot,ownerFlag} from './paths.mjs';
+export {repoRoot,profilePrefix,evidenceRoot};
 
 export async function withApp(name,{seed}={},journey){
  const profile=await mkdtemp(profilePrefix);
@@ -19,11 +15,12 @@ export async function withApp(name,{seed}={},journey){
  try{
   const options=await fixtureOptions({directory:profile,projectDir:repoRoot,executablePath:process.env.GRATIS_TEST_APP});
   if(process.env.VERIFY_HIDDEN!=='1')delete options.env.GRATIS_TEST_HIDDEN;
+  options.args.push(ownerFlag(profile));
   app=await electron.launch(options);
   const page=await app.firstWindow();
   page.on('pageerror',e=>rendererErrors.push(e.message));
   page.on('console',m=>{if(m.type()==='error')rendererErrors.push(m.text());});
-  await page.locator('#home-bots button, .composer-area:not([hidden]) #prompt').first().waitFor({state:'visible'});
+  await page.locator('#home-bots button:visible, #create-first-bot:visible, #prompt:visible').first().waitFor();
   const provider=await page.evaluate(async()=>(await window.orbit.snapshot()).settings.provider);
   if(provider!=='demo')throw new Error(`Refusing to drive: provider is "${provider}", only "demo" is allowed.`);
   step('ready',{profile,provider});

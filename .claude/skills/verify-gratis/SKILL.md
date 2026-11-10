@@ -26,13 +26,13 @@ node .claude/skills/verify-gratis/scripts/doctor.mjs
 node .claude/skills/verify-gratis/scripts/run.mjs <journey>
 ```
 
-`run.mjs` launches the app, waits until it is ready, runs one journey, saves evidence, closes the app, and deletes the profile. A run takes about 2 to 5 seconds. Ready means usable, not just that a process started. A bot tile in `#home-bots`, or a visible `#prompt`, must be rendered, and the provider check must pass. An empty profile needs no seed or migration. The app creates the bot "Gratis" and one empty conversation.
+`run.mjs` launches the app, waits until it is ready, runs one journey, saves evidence, closes the app, and deletes the profile. A run takes about 2 to 5 seconds. Ready means usable, not just that a process started. A visible bot tile in `#home-bots`, the empty-state `#create-first-bot` button, or a visible `#prompt` must be rendered, and the provider check must pass. An empty profile needs no seed or migration. The app creates the bot "Gratis" and one empty conversation.
 
 The window is visible by default because screenshots need a real window. Set `VERIFY_HIDDEN=1` to keep `GRATIS_TEST_HIDDEN=1` from the fixture. In hidden mode, a capture taken in the first moments after launch has been seen to show a stale frame, so trust hidden screenshots only after the ready wait.
 
 The app takes a single-instance lock and `recovery.lock` per data folder, so parallel runs with different profiles do not collide. Never set two runs to the same profile.
 
-Journeys today: `chat`, `create-bot`, `schedules`. To add one, add a function to `journeys` in `scripts/run.mjs`. It receives `{app, page, capture, step, workspace, profile, evidence}`. For ad-hoc exploration, import `withApp` from `scripts/lib.mjs` in a scratch script outside the repo and pass it your own journey function.
+Journeys today: `chat`, `create-bot`, `create-first-bot`, `schedules`. To add one, add a function to `journeys` in `scripts/run.mjs`. A journey that needs a starting `workspace.json` adds a builder to `seeds` in the same file. It receives `{app, page, capture, step, workspace, profile, evidence}`. For ad-hoc exploration, import `withApp` from `scripts/lib.mjs` in a scratch script outside the repo and pass it your own journey function.
 
 ## Doctor
 
@@ -79,7 +79,7 @@ Proof standards:
 node .claude/skills/verify-gratis/scripts/cleanup.mjs
 ```
 
-It touches only `$TMPDIR/gratis-verify-profile-*`. If a profile's `recovery.lock` PID is a live Electron process, it sends that PID SIGTERM. It never kills by process name, and it skips PIDs that aren't Electron. Then it deletes the profile. It never touches `gratis-verify-evidence`.
+It touches only `$TMPDIR/gratis-verify-profile-*`. `lib.mjs` launches every app with `--gratis-verify-profile=<profile dir>`. If a profile's `recovery.lock` PID is alive and its command line carries that exact flag, cleanup sends it SIGTERM, then SIGKILL after 10 seconds. A live PID without the flag was reused by another process, so cleanup leaves it alone and only deletes the stale profile. It never kills by process name. If it cannot inspect a PID, it leaves both the process and the profile. It never touches `gratis-verify-evidence`. It never touches `gratis-verify-evidence`.
 
 ## Feature map
 

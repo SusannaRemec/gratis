@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {withApp} from './lib.mjs';
+import {DEFAULT_SETTINGS} from '../../../../src/store.mjs';
+
+const seeds={
+ 'create-first-bot':()=>({version:1,bots:[],conversations:[],activeBotId:null,activeConversationId:null,settings:{...DEFAULT_SETTINGS}}),
+};
 
 const journeys={
  async chat({page,capture,step,workspace}){
@@ -60,6 +65,23 @@ const journeys={
   assert.ok(await page.getByText(name,{exact:true}).first().isVisible(),'bot visible');
   return {name,botCount:bots.length};
  },
+ async 'create-first-bot'({page,capture,step,workspace}){
+  const name=`First Bot ${Date.now()%100000}`;
+  assert.equal((await workspace()).bots.length,0,'seeded profile starts with no bots');
+  await capture('empty-home');
+  await page.locator('#create-first-bot').click();
+  await page.locator('#create-bot-dialog').waitFor({state:'visible'});
+  assert.ok(await page.locator('#create-bot-submit').isDisabled(),'Create disabled while name is blank');
+  await page.locator('#new-bot-name').fill(name);
+  await page.locator('#create-bot-submit').click();
+  await page.locator('#create-bot-dialog').waitFor({state:'hidden'});
+  step('created',name);
+  await capture('after-create');
+  const bots=(await workspace()).bots;
+  assert.deepEqual(bots.map(b=>b.name),[name],'only the new bot persisted');
+  assert.ok(await page.locator('#create-first-bot').isHidden(),'empty-state button gone');
+  return {name,botCount:bots.length};
+ },
 };
 
 async function openChat(page){
@@ -71,7 +93,7 @@ async function openChat(page){
 const name=process.argv[2];
 if(!journeys[name]){console.error(`Usage: run.mjs <${Object.keys(journeys).join('|')}>`);process.exit(2);}
 try{
- const {evidence}=await withApp(name,{},journeys[name]);
+ const {evidence}=await withApp(name,{seed:seeds[name]?.()},journeys[name]);
  console.log(`PASS ${name}\nevidence: ${evidence}`);
 }catch(error){
  console.error(`FAIL ${name}: ${error.message}\nevidence: ${error.evidence??'(none)'}`);

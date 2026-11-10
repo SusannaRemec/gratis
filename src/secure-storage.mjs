@@ -1,19 +1,23 @@
-// Use the same OS-backed key provider for all Mac vaults. Mixing Electron's
-// synchronous provider with its asynchronous provider can prompt twice on update.
-// A denied access attempt is terminal for this process, including later timers.
+// One lazily initialized Electron encryptor serves every vault. Serializing
+// access prevents separate startup features from requesting a second unlock.
 export function createSecureStorageAccess(storage,{platform=process.platform}={}){
- let locked=false;
+ let locked=false,initialized=false,tail=Promise.resolve();
  const error=()=>Object.assign(new Error('Secure storage is locked. Unlock your operating-system keychain and choose Try again.'),{code:'GRATIS_STORAGE_LOCKED'});
+ const basic=()=>platform==='linux'&&storage.getSelectedStorageBackend?.()==='basic_text';
  const access=operation=>{
-  if(locked)throw error();
-  try{
-   if(platform==='linux'&&storage.getSelectedStorageBackend?.()==='basic_text')throw error();
-   // The native encrypt/decrypt call already checks availability. Checking it
-   // separately can itself ask for access, then ask again in the operation.
-   return operation();
-  }catch{locked=true;throw error();}
+  const task=tail.then(async()=>{
+   if(locked)throw error();
+   try{
+    if(basic())throw error();
+    if(!initialized){if(!await storage.isAsyncEncryptionAvailable()||basic())throw error();initialized=true;}
+    return await operation();
+   }catch{locked=true;throw error();}
+  });
+  tail=task.catch(()=>{});return task;
  };
- const encrypt=text=>access(()=>storage.encryptString(text));
- const decrypt=bytes=>access(()=>storage.decryptString(bytes));
- return{encrypt,decrypt,get locked(){return locked;},keyring:{wrapKey:async text=>encrypt(text),unwrapKey:async bytes=>decrypt(bytes)}};
+ const encrypt=text=>access(()=>storage.encryptStringAsync(text));
+ const unpack=value=>typeof value==='string'?value:value.result;
+ const decrypt=bytes=>access(async()=>unpack(await storage.decryptStringAsync(bytes)));
+ const unwrapKey=bytes=>access(async()=>{const result=await storage.decryptStringAsync(bytes);return typeof result==='string'?result:{value:result.result,rewrap:!!result.shouldReEncrypt};});
+ return{encrypt,decrypt,get locked(){return locked;},keyring:{wrapKey:encrypt,unwrapKey}};
 }

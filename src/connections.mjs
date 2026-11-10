@@ -6,8 +6,8 @@ import {Composio} from '@composio/core';
 // Credentials never enter workspace snapshots or the renderer.
 export class Connections {
   constructor({directory,encrypt,decrypt,createClient=credential=>new Composio(typeof credential==='string'?{apiKey:credential}:credential)}){this.directory=directory;this.encrypt=encrypt;this.decrypt=decrypt;this.createClient=createClient;this.value={userId:randomUUID()};this.sessionPromise=null;}
-  async init(){await mkdir(this.directory,{recursive:true,mode:0o700});try{this.value=JSON.parse(this.decrypt(await readFile(join(this.directory,'connections.secure'))));}catch(error){if(error.code!=='ENOENT')throw new Error('Could not unlock saved connections.');}return this;}
-  async save(){const temporary=join(this.directory,`.connections-${randomUUID()}`);await writeFile(temporary,this.encrypt(JSON.stringify(this.value)),{mode:0o600});await rename(temporary,join(this.directory,'connections.secure'));}
+  async init(){await mkdir(this.directory,{recursive:true,mode:0o700});try{this.value=JSON.parse(await this.decrypt(await readFile(join(this.directory,'connections.secure'))));}catch(error){if(error.code!=='ENOENT')throw new Error('Could not unlock saved connections.');}return this;}
+  async save(){const temporary=join(this.directory,`.connections-${randomUUID()}`);await writeFile(temporary,await this.encrypt(JSON.stringify(this.value)),{mode:0o600});await rename(temporary,join(this.directory,'connections.secure'));}
   status(){return {composio:!!(this.value.composioKey||this.value.composioAccount),cloud:!!this.value.cloud?.token,cloudEndpoint:this.value.cloud?.endpoint||''};}
   async configure({composioKey,cloudEndpoint,cloudToken}={}){
     if(composioKey!==undefined){if(typeof composioKey!=='string'||composioKey.length>2000)throw new Error('Invalid Composio key.');this.value.composioKey=composioKey.trim();delete this.value.composioAccount;delete this.value.sessionId;this.sessionPromise=null;}

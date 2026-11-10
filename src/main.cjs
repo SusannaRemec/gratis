@@ -72,9 +72,9 @@ app.whenReady().then(async () => {
   };
   files=new WorkspaceFiles(dataDir);
   cloud=new CloudComputer(connections,{onFrame:frame=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:computer-frame',frame);},onState:state=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:computer-state',controlState(state));}});
-  const {MemoryService}=await import('./memory-service.mjs'),{MemoryEmbeddings}=await import('./memory-embeddings.mjs'),{memoryKeyring}=await import('./memory-keyring.mjs');
+  const {MemoryService}=await import('./memory-service.mjs'),{MemoryEmbeddings}=await import('./memory-embeddings.mjs');
   const embeddings=new MemoryEmbeddings({modelPath:(app.isPackaged?path.join(process.resourcesPath,'models','sentence-encoder'):path.join(__dirname,'../assets/models/sentence-encoder'))+path.sep});
-  memory=await new MemoryService({directory:dataDir,...(process.platform==='darwin'?secureStorageAccess.keyring:memoryKeyring(safeStorage)),embeddings,onChange:value=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:memory-changed',value);}}).init();
+  memory=await new MemoryService({directory:dataDir,...secureStorageAccess.keyring,embeddings,onChange:value=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:memory-changed',value);}}).init();
   service = new ChatService({ dataDir, memory, workspaceFiles:files, onChange: broadcast,
     onGroupMembersChanging:async({retired,retained})=>{
       for(const seat of [...retired,...retained])computerControlEpochs.set(seat.conversationId,(computerControlEpochs.get(seat.conversationId)||0)+1);

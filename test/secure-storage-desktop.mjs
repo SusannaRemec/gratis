@@ -13,7 +13,7 @@ try{
   const access=createSecureStorageAccess(safeStorage);
   const before=safeStorage.encryptString('legacy connection fixture');
   const oldMemoryKey=await safeStorage.encryptStringAsync('legacy memory key fixture');
-  return{connection:access.decrypt(before)==='legacy connection fixture',memory:await access.keyring.unwrapKey(oldMemoryKey)==='legacy memory key fixture',roundTrip:access.decrypt(access.encrypt('new fixture'))==='new fixture'};
+  return{connection:await access.decrypt(before)==='legacy connection fixture',memory:(await access.keyring.unwrapKey(oldMemoryKey)).value==='legacy memory key fixture',roundTrip:await access.decrypt(await access.encrypt('new fixture'))==='new fixture',rollbackCompatible:safeStorage.decryptString(await access.encrypt('rollback fixture'))==='rollback fixture'};
  });
- assert.deepEqual(result,{connection:true,memory:true,roundTrip:true});console.log(JSON.stringify({passed:true,...result}));
+ assert.deepEqual(result,{connection:true,memory:true,roundTrip:true,rollbackCompatible:true});console.log(JSON.stringify({passed:true,...result}));
 }finally{await instance.close();await rm(directory,{recursive:true,force:true});}

@@ -33,4 +33,4 @@ Automated tests cover a stalled provider, late callbacks after cancellation, rep
 
 ## Keychain access
 
-On macOS, saved connections and the memory key use the same OS-backed provider. A denied secure-storage operation blocks further attempts in that process, so background work cannot reopen the prompt. The startup dialog offers an explicit Try again action; existing encrypted files are preserved. Unsigned or ad-hoc signed updates may still need fresh macOS approval because their signing identity is not stable across builds. No plaintext credential fallback is enabled.
+All vaults share one lazily initialized asynchronous OS-backed provider, and requests are serialized. A denied secure-storage operation blocks further attempts in that process, so background work cannot reopen the prompt. The startup dialog offers an explicit Try again action; existing encrypted files are preserved. Unsigned or ad-hoc signed updates may still need fresh macOS approval because their signing identity is not stable across builds. No plaintext credential fallback is enabled.

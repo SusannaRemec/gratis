@@ -48,3 +48,4 @@ jobs:
           node test/desktop-features.mjs
           node test/recovery-desktop.mjs
           node test/slack-desktop.mjs
+          node test/dialog-buttons.mjs

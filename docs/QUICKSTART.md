@@ -4,7 +4,7 @@ Before installing, read the [installation and use notice](../DISCLAIMER.md). Rev
 
 ## 1. Install and launch
 
-Use a Mac with Apple Silicon, Node.js 22+ and npm. Clone the repository and run the four commands in the main README. `npm run setup:assets` downloads a fixed revision of the semantic memory encoder and a fixed Composio CLI release, verifies checksums, and installs them only inside this checkout. It does not copy your account configuration or sign you in.
+For an app installer, use [Gratis Core 0.4.2 downloads](https://github.com/promptadvisers/gratis/releases/tag/v0.4.2) and drag Gratis Core to Applications. For source development, use a Mac with Apple Silicon or Intel, Node.js 22+ and npm. Clone the repository and run the four commands in the main README. `npm run setup:assets` downloads a fixed revision of the semantic memory encoder and a fixed Composio CLI release, verifies checksums, and installs them only inside this checkout. It does not copy your account configuration or sign you in.
 
 `npm start` opens **Gratis Core**. This edition uses its own local app data folder, separate from other editions. A fresh checkout starts with an empty demo conversation.
 

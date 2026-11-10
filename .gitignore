@@ -18,3 +18,5 @@ packages/cloud/.dev.vars
 coverage/
 playwright-report/
 test-results/
+
+dist/

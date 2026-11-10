@@ -24,9 +24,22 @@ Configure run limits, preserve partial work, and create verified local checkpoin
 - **Use a separate computer.** An optional self-hosted cloud browser supports live viewing, manual takeover and resuming after your changes.
 - **Delegate project work.** Connect your own T3 environment for work that continues independently of the desktop window.
 
+## Download and install
+
+Download [Gratis Core 0.4.2](https://github.com/promptadvisers/gratis/releases/tag/v0.4.2), including the Keychain and Cancel/Close fixes. Expand **Assets** and choose:
+
+| Mac | Installer |
+| --- | --- |
+| Apple Silicon | `Gratis-Core-0.4.2-mac-arm64.dmg` |
+| Intel | `Gratis-Core-0.4.2-mac-x64.dmg` |
+
+Open the DMG, then drag **Gratis Core** into **Applications**. Close the app before replacing an older copy. The installer does not reset its data folder. GitHub’s **Source code** ZIP is not an app installer.
+
+These previews are ad-hoc signed, not notarized. Do not disable system security protections globally. See [installation details and checksums](docs/DOWNLOADS.md).
+
 ## Start from source
 
-The desktop build currently targets **macOS Apple Silicon**. Other platforms have not been release-tested. You need Node.js 22+, npm, and an eligible provider account for live AI replies. You can explore the interface in demo mode without an account.
+The downloadable desktop build targets **macOS Apple Silicon and Intel**. Windows and Linux core installers are not supplied. You need Node.js 22+, npm, and an eligible provider account for live AI replies. You can explore the interface in demo mode without an account.
 
 ```sh
 git clone https://github.com/promptadvisers/gratis.git

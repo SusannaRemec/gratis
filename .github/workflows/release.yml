@@ -1,0 +1,66 @@
+name: Build core downloads
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the preview after both Mac installer checks pass
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run setup:assets
+      - run: npm run package:mac
+      - run: node scripts/package-dmg.mjs
+      - name: Verify the downloadable installer
+        run: |
+          for dmg in dist/*.dmg; do node scripts/verify-dmg.mjs "$dmg" --smoke; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Gratis-Core-mac-${{ matrix.arch }}
+          path: dist/*.dmg
+          if-no-files-found: error
+          retention-days: 14
+  release:
+    if: inputs.publish
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          pattern: Gratis-Core-mac-*
+          merge-multiple: true
+      - name: Publish tested core installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$GITHUB_REPOSITORY" = promptadvisers/gratis
+          VERSION=$(node -p 'require("./package.json").version')
+          test -f "installers/Gratis-Core-$VERSION-mac-arm64.dmg"
+          test -f "installers/Gratis-Core-$VERSION-mac-x64.dmg"
+          test "$(find installers -maxdepth 1 -name '*.dmg' | wc -l)" -eq 2
+          cd installers
+          sha256sum *.dmg > SHA256SUMS.txt
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title "Gratis Core $VERSION preview" --notes-file ../docs/RELEASE_NOTES.md ./*

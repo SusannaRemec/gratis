@@ -30,3 +30,7 @@ Unknown versions are refused without rewriting them. A future ownership migratio
 ## Validation boundaries
 
 Automated tests cover a stalled provider, late callbacks after cancellation, repeated tool failures, queue pausing, continuation, concurrent file limits, T3 retries, corrupted checkpoints, interrupted restore, future-version refusal, and a live-workspace recovery lock. Provider streams and remote T3 replies in those tests are synthetic. No test accesses a real user's keychain or chats. A passing test suite is not a claim of notarization or an external security audit.
+
+## Keychain access
+
+On macOS, saved connections and the memory key use the same OS-backed provider. A denied secure-storage operation blocks further attempts in that process, so background work cannot reopen the prompt. The startup dialog offers an explicit Try again action; existing encrypted files are preserved. Unsigned or ad-hoc signed updates may still need fresh macOS approval because their signing identity is not stable across builds. No plaintext credential fallback is enabled.

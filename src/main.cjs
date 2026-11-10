@@ -16,7 +16,7 @@ const humanComputers=new Set(),computerControlEpochs=new Map(),computerControlRe
 function setHumanControl(id,human){if(humanComputers.has(id)!==human){human?humanComputers.add(id):humanComputers.delete(id);computerControlRevisions.set(id,(computerControlRevisions.get(id)||0)+1);}}
 const controlState=value=>({...value,control:humanComputers.has(value.conversationId)?'human':'bot',controlRevision:computerControlRevisions.get(value.conversationId)||0});
 const computerSnapshot=id=>{const snapshot=cloud.snapshot(id);return {...snapshot,state:controlState(snapshot.state)};};
-let messaging,messagingStartupError;
+let messaging,messagingStartupError,secureStorageAccess;
 let releaseDataLock, window, service, connections, files, cloud, signIn, memory, t3Connection, t3Tasks, t3Host, schedules, closing = false, finishDraftFlush, voiceTask;
 app.on('activate',()=>{if(window&&!window.isDestroyed()){window.show();window.focus();}});
 app.on('second-instance', () => { if (window && !window.isDestroyed()) { window.show(); window.focus(); } });
@@ -48,7 +48,8 @@ app.whenReady().then(async () => {
   const safety=await import('./storage-safety.mjs');releaseDataLock=await safety.acquireDataLock(dataDir);await safety.prepareStorage(dataDir);
   const { ChatService } = await import('./chat-service.mjs');
   const [{Connections},{WorkspaceFiles},{CloudComputer},{agentRuntime},{ComposioSignIn}] = await Promise.all([import('./connections.mjs'),import('./workspace-files.mjs'),import('./cloud-computer.mjs'),import('./agent-tools.mjs'),import('./composio-signin.mjs')]);
-  connections=await new Connections({directory:dataDir,encrypt:text=>{if(!safeStorage.isEncryptionAvailable())throw new Error('Secure storage is unavailable.');return safeStorage.encryptString(text);},decrypt:buffer=>safeStorage.decryptString(buffer)}).init();
+  const {createSecureStorageAccess}=await import('./secure-storage.mjs');secureStorageAccess=createSecureStorageAccess(safeStorage);
+  connections=await new Connections({directory:dataDir,encrypt:secureStorageAccess.encrypt,decrypt:secureStorageAccess.decrypt}).init();
   signIn=new ComposioSignIn({directory:dataDir,binary:app.isPackaged?path.join(process.resourcesPath,'composio-cli','composio'):path.join(__dirname,'../assets/composio-cli/composio'),connections,openExternal:url=>shell.openExternal(url),onState:state=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:signin-state',state);}});
   connections.onChange=()=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:connections-changed');};
   const [{T3Connection},{T3Tasks},{T3LocalHost}]=await Promise.all([import('./t3-connection.mjs'),import('./t3-tasks.mjs'),import('./t3-local.mjs')]);
@@ -73,7 +74,7 @@ app.whenReady().then(async () => {
   cloud=new CloudComputer(connections,{onFrame:frame=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:computer-frame',frame);},onState:state=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:computer-state',controlState(state));}});
   const {MemoryService}=await import('./memory-service.mjs'),{MemoryEmbeddings}=await import('./memory-embeddings.mjs'),{memoryKeyring}=await import('./memory-keyring.mjs');
   const embeddings=new MemoryEmbeddings({modelPath:(app.isPackaged?path.join(process.resourcesPath,'models','sentence-encoder'):path.join(__dirname,'../assets/models/sentence-encoder'))+path.sep});
-  memory=await new MemoryService({directory:dataDir,...memoryKeyring(safeStorage),embeddings,onChange:value=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:memory-changed',value);}}).init();
+  memory=await new MemoryService({directory:dataDir,...(process.platform==='darwin'?secureStorageAccess.keyring:memoryKeyring(safeStorage)),embeddings,onChange:value=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:memory-changed',value);}}).init();
   service = new ChatService({ dataDir, memory, workspaceFiles:files, onChange: broadcast,
     onGroupMembersChanging:async({retired,retained})=>{
       for(const seat of [...retired,...retained])computerControlEpochs.set(seat.conversationId,(computerControlEpochs.get(seat.conversationId)||0)+1);
@@ -96,6 +97,7 @@ app.whenReady().then(async () => {
     if (primary?.name === 'Personal assistant' && primary.instructions === 'Be helpful, clear, and concise.')
       await service.updateBot({ id: primary.id, name: 'Gratis' });
   }
+  if(secureStorageAccess.locked)throw new Error('Secure storage is locked.');
   window = new BrowserWindow({ width: 1496, height: 938, minWidth: 512, minHeight: 520, show: false,
     title: edition.name, backgroundColor: '#121212', titleBarStyle: 'hiddenInset', trafficLightPosition: { x:16,y:15 },
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'),
@@ -285,7 +287,8 @@ app.whenReady().then(async () => {
   if (process.env.GRATIS_TEST_HIDDEN !== '1') window.show();
 }).catch(async error => {
   await releaseDataLock?.();console.error(error);
-  dialog.showErrorBox('Gratis could not start', error.message);
+  if(secureStorageAccess?.locked){const {response}=await dialog.showMessageBox({type:'warning',title:'Gratis is locked',message:'Secure storage could not be opened.',detail:'Your chats, settings and encrypted credentials have not been reset. Unlock your operating-system keychain, then choose Try again. Gratis will not keep asking in the background.',buttons:['Quit','Try again'],defaultId:0,cancelId:0});if(response===1)app.relaunch();}
+  else dialog.showErrorBox('Gratis could not start', error.message);
   app.exit(1);
 });
 app.on('window-all-closed', () => app.quit());

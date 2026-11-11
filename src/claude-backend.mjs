@@ -149,7 +149,7 @@ export function createClaudeReply({ query: injectedQuery, resolveExecutable = fi
             const u = event.usage || {};
             onMetadata({
               claudeSession: persistSession && sessionId ? { id: sessionId, signature, historyHash: digest([...messages, { role: 'assistant', content: output }]) } : null,
-              usage: { inputTokens: u.input_tokens || 0, outputTokens: u.output_tokens || 0, cacheReadInputTokens: u.cache_read_input_tokens || 0, model: settings.model },
+              usage: { inputTokens: u.input_tokens || 0, outputTokens: u.output_tokens || 0, cacheReadInputTokens: u.cache_read_input_tokens || 0, cacheCreationInputTokens: u.cache_creation_input_tokens || 0, model: settings.model },
             });
           }
         }

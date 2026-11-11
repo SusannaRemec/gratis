@@ -17,7 +17,7 @@ async function* success(text = 'Hello') {
   yield { type: 'system', subtype: 'init', session_id: sessionId, tools: [] };
   yield { type: 'stream_event', parent_tool_use_id: null, event: { type: 'content_block_delta', delta: { type: 'text_delta', text } } };
   yield { type: 'assistant', message: { content: [{ type: 'text', text }] } };
-  yield { type: 'result', subtype: 'success', session_id: sessionId, result: text, usage: { input_tokens: 10, output_tokens: 2, cache_read_input_tokens: 8 } };
+  yield { type: 'result', subtype: 'success', session_id: sessionId, result: text, usage: { input_tokens: 10, output_tokens: 2, cache_read_input_tokens: 8, cache_creation_input_tokens: 5000 } };
 }
 
 test('Claude environment retains login location but drops API billing credentials and unrelated secrets', () => {
@@ -39,6 +39,7 @@ test('Claude streaming does not duplicate the final message, and the next turn r
   assert.equal(await collect(reply({ ...args, messages: [{ role: 'user', content: 'Hi' }] })), 'Hello');
   const saved = metadata.claudeSession;
   assert.equal(metadata.usage.outputTokens, 2);
+  assert.equal(metadata.usage.cacheCreationInputTokens, 5000);
   assert.deepEqual(calls[0].options.tools, []); assert.deepEqual(calls[0].options.disallowedTools, ['*']);
   assert.deepEqual(calls[0].options.settingSources, []); assert.equal(calls[0].options.strictMcpConfig, true);
   const history = [{ role: 'user', content: 'Hi' }, { role: 'assistant', content: 'Hello' }, { role: 'user', content: 'Next' }];

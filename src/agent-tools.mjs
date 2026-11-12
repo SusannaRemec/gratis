@@ -5,7 +5,7 @@ import {COMPUTER_ACTIONS} from './cloud-computer.mjs';
 import {searchWeb,readWebpage,publicURL} from './web-tools.mjs';
 
 export const defaultCapabilities={web:true,files:true,computer:true,connections:true};
-export async function agentRuntime({bot,conversationId,files,cloud,connections,signal,onActivity,approve,collaboration,memory,t3,schedules,requestComputerHelp,canUseComputer=()=>true}) {
+export async function agentRuntime({bot,conversationId,files,cloud,connections,directApps,signal,onActivity,approve,collaboration,memory,t3,schedules,requestComputerHelp,canUseComputer=()=>true}) {
   const capabilities={...defaultCapabilities,...bot.capabilities},tools=[],definitions=[],mcpServers={};
   const register=(name,description,schema,handler)=>{const wrapped=async input=>{
     const id=crypto.randomUUID();onActivity({id,name,input:name.endsWith('_memory')?{scope:input.scope,query:input.query,manual:true}:traceValue(input),status:'running',startedAt:Date.now()});
@@ -60,5 +60,6 @@ export async function agentRuntime({bot,conversationId,files,cloud,connections,s
   }
   if(tools.length)mcpServers.gratis=createSdkMcpServer({name:'gratis',version:'1.0.0',tools});
   if(capabilities.connections&&connections.status().composio)mcpServers.composio=await connections.mcp();
-  return {mcpServers,definitions,onActivity,collaboration,memory,t3,schedules,web:capabilities.web,capabilities,workspaceRoot:files.root(bot.id),approve:async(name,input)=>(capabilities.connections&&await connections.isReadOnlyAction?.(name,input))||approve(name,input),signature:JSON.stringify({capabilities,participants:collaboration?.members.map(m=>m.id),memory:!!memory,schedules:!!schedules,cloud:connections.status().cloud,composio:connections.status().composio,t3:t3?.binding})};
+  if(capabilities.connections&&directApps)Object.assign(mcpServers,await directApps.servers());
+  return {mcpServers,definitions,onActivity,collaboration,memory,t3,schedules,web:capabilities.web,capabilities,workspaceRoot:files.root(bot.id),approve:async(name,input)=>(capabilities.connections&&(await connections.isReadOnlyAction?.(name,input)||await directApps?.isReadOnlyAction(name)))||approve(name,input),signature:JSON.stringify({capabilities,participants:collaboration?.members.map(m=>m.id),memory:!!memory,schedules:!!schedules,cloud:connections.status().cloud,composio:connections.status().composio,apps:Object.keys(mcpServers).filter(k=>k.startsWith('app_')),t3:t3?.binding})};
 }

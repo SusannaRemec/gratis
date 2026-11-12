@@ -17,7 +17,7 @@ function setHumanControl(id,human){if(humanComputers.has(id)!==human){human?huma
 const controlState=value=>({...value,control:humanComputers.has(value.conversationId)?'human':'bot',controlRevision:computerControlRevisions.get(value.conversationId)||0});
 const computerSnapshot=id=>{const snapshot=cloud.snapshot(id);return {...snapshot,state:controlState(snapshot.state)};};
 let messaging,messagingStartupError,secureStorageAccess;
-let releaseDataLock, window, service, connections, files, cloud, signIn, memory, t3Connection, t3Tasks, t3Host, schedules, closing = false, finishDraftFlush, voiceTask;
+let releaseDataLock, window, service, connections, directApps, files, cloud, signIn, memory, t3Connection, t3Tasks, t3Host, schedules, closing = false, finishDraftFlush, voiceTask;
 app.on('activate',()=>{if(window&&!window.isDestroyed()){window.show();window.focus();}});
 app.on('second-instance', () => { if (window && !window.isDestroyed()) { window.show(); window.focus(); } });
 async function shutdown() {
@@ -32,7 +32,7 @@ async function shutdown() {
   }
   const activeVoice = voiceTask;
   activeVoice?.controller.abort(new DOMException('App closed', 'AbortError'));
-  try { await messaging?.close(); await activeVoice?.promise?.catch(() => {}); await signIn?.cancel({preserve:true}); await schedules?.close(); await t3Tasks?.close(); await t3Connection?.close(); await service?.close(); await cloud?.close(); } finally { await releaseDataLock?.(); app.exit(0); }
+  try { await messaging?.close(); await activeVoice?.promise?.catch(() => {}); await signIn?.cancel({preserve:true}); directApps?.cancel(); await directApps?.persist; await schedules?.close(); await t3Tasks?.close(); await t3Connection?.close(); await service?.close(); await cloud?.close(); } finally { await releaseDataLock?.(); app.exit(0); }
 }
 const actions = ['createBot', 'deleteBot', 'selectBot', 'newConversation', 'selectConversation', 'setDraft',
   'createThread','renameThread','updateThreadMembers','pinThread','deleteThread','updateSettings', 'updateBot', 'duplicateBot', 'respondApproval', 'updateQueue', 'send', 'stop', 'retry'];
@@ -52,6 +52,8 @@ app.whenReady().then(async () => {
   connections=await new Connections({directory:dataDir,encrypt:secureStorageAccess.encrypt,decrypt:secureStorageAccess.decrypt}).init();
   signIn=new ComposioSignIn({directory:dataDir,binary:app.isPackaged?path.join(process.resourcesPath,'composio-cli','composio'):path.join(__dirname,'../assets/composio-cli/composio'),connections,openExternal:url=>shell.openExternal(url),onState:state=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:signin-state',state);}});
   connections.onChange=()=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:connections-changed');};
+  const {DirectApps}=await import('./direct-apps.mjs');
+  directApps=await new DirectApps({directory:dataDir,encrypt:secureStorageAccess.encrypt,decrypt:secureStorageAccess.decrypt,openExternal:url=>shell.openExternal(url),onChange:()=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:connections-changed');}}).init();
   const [{T3Connection},{T3Tasks},{T3LocalHost}]=await Promise.all([import('./t3-connection.mjs'),import('./t3-tasks.mjs'),import('./t3-local.mjs')]);
   const t3Changed=()=>{if(window&&!window.isDestroyed())window.webContents.send('orbit:t3-changed');};
   t3Connection=await new T3Connection({directory:dataDir,encrypt:connections.encrypt,decrypt:connections.decrypt,openExternal:url=>shell.openExternal(url),onState:t3Changed}).init();
@@ -83,7 +85,7 @@ app.whenReady().then(async () => {
         ...retained.map(async seat=>{if(connections.status().cloud&&(humanComputers.has(seat.conversationId)||cloud.serverOwners.get(seat.conversationId))){await cloud.whenIdle(seat.conversationId);await cloud.control(seat.botId,seat.conversationId,false);}setHumanControl(seat.conversationId,false);if(window&&!window.isDestroyed())window.webContents.send('orbit:computer-state',computerSnapshot(seat.conversationId).state);}),
       ]);
       if(results.some(r=>r.status==='rejected'))throw new Error('Could not finish stopping a group computer. Your member changes have not been saved. Try again.');
-    },runtimeFactory:args=>agentRuntime({...args,files,cloud,connections,canUseComputer:()=>!humanComputers.has(args.conversationId),t3:service._conversation(args.conversationId).messaging&&!service._conversation(args.conversationId).messaging.allowTools?undefined:t3Agent(args),schedules:service._conversation(args.conversationId).messaging&&!service._conversation(args.conversationId).messaging.allowTools?undefined:scheduleAgent(args)}) });
+    },runtimeFactory:args=>agentRuntime({...args,files,cloud,connections,directApps,canUseComputer:()=>!humanComputers.has(args.conversationId),t3:service._conversation(args.conversationId).messaging&&!service._conversation(args.conversationId).messaging.allowTools?undefined:t3Agent(args),schedules:service._conversation(args.conversationId).messaging&&!service._conversation(args.conversationId).messaging.allowTools?undefined:scheduleAgent(args)}) });
   await service.init();
   await (await import('./edition-setup.mjs')).applyEdition(service,edition);
   const {Schedules}=await import('./schedules.mjs');
@@ -170,6 +172,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('orbit:configure-connections', async (e,value) => {authorized(e);return connections.configure(value);});
   ipcMain.handle('orbit:connection-catalog', async (e,search) => {authorized(e);return connections.catalog(search);});
   ipcMain.handle('orbit:connect-app', async (e,slug) => {authorized(e);const url=await connections.connect(slug);await shell.openExternal(url);return true;});
+  for(const [name,operation]of Object.entries({status:()=>directApps.status(),connect:v=>directApps.connect(v?.id),disconnect:v=>directApps.disconnect(v?.id),cancel:()=>directApps.cancel(),add:v=>directApps.add(v),google:v=>directApps.configureGoogle(v)}))ipcMain.handle('orbit:direct-apps-'+name,async(e,value)=>{authorized(e);return operation(value);});
   const t3Scope=value=>{const c=service._conversation(value?.conversationId);service._threadOpen(c);return c;};
   for(const [name,operation]of Object.entries({view:v=>schedules.snapshot(v.conversationId),create:v=>schedules.create(v),update:v=>schedules.update(v),remove:v=>schedules.remove(v),run:v=>schedules.runNow(v)}))ipcMain.handle('orbit:schedules-'+name,async(e,value)=>{authorized(e);service._conversation(value?.conversationId);return operation(value);});
   ipcMain.handle('orbit:t3-view',(e,value)=>{authorized(e);const c=t3Scope(value);return{connection:t3Connection.snapshot(),binding:t3Connection.data.bindings?.[c.botId]||null,jobs:t3Tasks.snapshot(c.id)};});

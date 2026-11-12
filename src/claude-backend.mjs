@@ -114,7 +114,7 @@ export function createClaudeReply({ query: injectedQuery, resolveExecutable = fi
             canUseTool: async (name,input,{signal:toolSignal}) => {
               if(name.startsWith('mcp__gratis__'))return {behavior:'allow',updatedInput:input};
               if(runtime?.web&&['WebSearch','WebFetch'].includes(name))return {behavior:'allow',updatedInput:input};
-              if(runtime&&name.startsWith('mcp__composio__')&&!toolSignal.aborted){const allowed=await runtime.approve(name,input);return allowed?{behavior:'allow',updatedInput:input}:{behavior:'deny',message:'User declined this action.'};}
+              if(runtime&&/^mcp__(composio|app_[a-z0-9_]+)__/.test(name)&&!toolSignal.aborted){const allowed=await runtime.approve(name,input);return allowed?{behavior:'allow',updatedInput:input}:{behavior:'deny',message:'User declined this action.'};}
               return {behavior:'deny',message:'This tool is not enabled for this bot.'};
             },
             persistSession, promptSuggestions: false, verbatimPrompts: true,

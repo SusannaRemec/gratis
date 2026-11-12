@@ -139,8 +139,25 @@ export function setupWorkspace({api,getState,run,avatar,onOpenSource}){
     $('connection-error').hidden=true;
     try{renderSignIn(await api.signInStart());}catch(error){renderSignIn({status:'error',error:error.message});}
   }
+  const connectionError=error=>{$('connection-error').textContent=error.message||String(error);$('connection-error').hidden=false;};
+  function paintDirectApps(value){
+    $('google-redirect').textContent=value.googleRedirect;$('google-client-status').textContent=value.googleClient?'Google client saved. Paste new values to replace it.':'No Google client saved yet.';
+    $('direct-apps').replaceChildren(...value.apps.map(app=>{
+      const row=document.createElement('div');row.className='connected-app direct-app';const text=document.createElement('span'),name=document.createElement('strong'),note=document.createElement('small');
+      name.textContent=app.name;note.textContent=app.state==='error'?app.error:app.state==='authorizing'?'Finish signing in in your browser.':app.state==='connected'?'Connected':app.note||app.url;if(app.state==='error')note.className='direct-app-error';
+      text.append(name,note);const actions=document.createElement('span');actions.className='direct-app-actions';
+      const button=(label,run,primary)=>{const b=document.createElement('button');b.type='button';b.className=primary?'primary':'quiet-button';b.textContent=label;b.onclick=async()=>{b.disabled=true;try{paintDirectApps(await run());}catch(error){b.disabled=false;connectionError(error);}};actions.append(b);};
+      if(app.state==='authorizing')button('Cancel',()=>api.directAppsCancel());
+      else if(app.state==='connected')button(app.custom?'Remove':'Disconnect',()=>api.directAppsDisconnect({id:app.id}));
+      else{button(app.state==='error'?'Retry':'Connect',()=>{$('connection-error').hidden=true;if(app.google&&!value.googleClient)$('google-setup').open=true;return api.directAppsConnect({id:app.id});},true);if(app.custom)button('Remove',()=>api.directAppsDisconnect({id:app.id}));}
+      row.append(text,actions);return row;
+    }));
+  }
+  const refreshDirectApps=async()=>{try{paintDirectApps(await api.directAppsStatus());}catch(error){connectionError(error);}};
+  $('save-google').onclick=async()=>{try{paintDirectApps(await api.directAppsGoogle({clientId:$('google-client-id').value,clientSecret:$('google-client-secret').value}));$('google-client-id').value='';$('google-client-secret').value='';$('connection-error').hidden=true;}catch(error){connectionError(error);}};
+  $('add-custom-app').onclick=async()=>{try{paintDirectApps(await api.directAppsAdd({name:$('custom-app-name').value,url:$('custom-app-url').value}));$('custom-app-name').value='';$('custom-app-url').value='';$('connection-error').hidden=true;}catch(error){connectionError(error);}};
   async function connections({signIn=false}={}){
-    const status=await api.connections();linked=status.composio;
+    const status=await api.connections();linked=status.composio;void refreshDirectApps();
     $('cloud-status').textContent=status.cloud?'Cloud computer connected':'Cloud computer not connected';$('cloud-endpoint').value=status.cloudEndpoint;$('connection-error').hidden=true;
     if(!$('connections-dialog').open)$('connections-dialog').showModal();renderSignIn(await api.signInState());
     if(linked)void loadCatalog();
@@ -168,7 +185,7 @@ export function setupWorkspace({api,getState,run,avatar,onOpenSource}){
   $('app-search').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadCatalog(),300);};$('refresh-apps').onclick=()=>loadCatalog();$('apps-more').onclick=()=>loadCatalog(true);
   $('composio-signin').onclick=beginSignIn;$('composio-signin-cancel').onclick=async()=>renderSignIn(await api.signInCancel());$('composio-signin-open').onclick=()=>api.signInOpen();
   api.onSignInState(value=>{if(value.status==='connected'){linked=true;if($('connections-dialog').open)void loadCatalog();}renderSignIn(value);});
-  api.onConnectionsChanged(()=>{if($('connections-dialog').open)void loadCatalog();});
+  api.onConnectionsChanged(()=>{if($('connections-dialog').open){void loadCatalog();void refreshDirectApps();}});
   window.addEventListener('focus',()=>{if(linked&&$('connections-dialog').open)void loadCatalog();});
   $('connections-form').onsubmit=async e=>{e.preventDefault();const value={};if($('composio-key').value)value.composioKey=$('composio-key').value;if($('cloud-token').value){value.cloudEndpoint=$('cloud-endpoint').value;value.cloudToken=$('cloud-token').value;}try{await api.configureConnections(value);$('composio-key').value='';$('cloud-token').value='';$('connections-dialog').close();await connections();}catch(error){$('connection-error').textContent=error.message;$('connection-error').hidden=false;}};
   $('test-cloud').onclick=async()=>{try{const result=await api.cloudHealth();$('cloud-status').textContent=result.ok?'Cloud computer is online':'Cloud computer unavailable';}catch(error){$('cloud-status').textContent=error.message;}};

@@ -46,3 +46,22 @@ test('switching subscriptions preserves chat history and independent per-bot mod
 test('changing recalled data keeps a Codex session warm; privacy changes require fresh context',async t=>{
  const calls=[];let metadata;const client={startThread:()=>thread(false),resumeThread:()=>thread(true)};function thread(resumed){calls.push({resumed});return{id,runStreamed:async prompt=>{calls.at(-1).prompt=prompt;return{events:success()};}};}const reply=createCodexReply({createClient:()=>client,status:async()=>({signedIn:true}),resolveExecutable:async()=>'/fake'}),common={bot,settings,workspaceDir:await directory(t),signal:new AbortController().signal,onMetadata:m=>metadata=m};let messages=[{role:'user',content:'Hi'}];await collect(reply({...common,messages,turnContext:'Preference A',contextEpoch:0}));const first=metadata.codexSession;messages.push({role:'assistant',content:'Hello'},{role:'user',content:'Next'});await collect(reply({...common,messages,codexSession:first,turnContext:'Preference B',contextEpoch:0}));assert.equal(calls[1].resumed,true);assert.match(calls[1].prompt,/Preference B/);const second=metadata.codexSession;messages.push({role:'assistant',content:'Hello'},{role:'user',content:'After forget'});await collect(reply({...common,messages,codexSession:second,turnContext:'',contextEpoch:1}));assert.equal(calls[2].resumed,false);await collect(reply({...common,messages:[{role:'user',content:'Background extraction'}],persistSession:false}));assert.match(await readFile(common.workspaceDir+'/codex-launcher','utf8'),/--ephemeral/);
 });
+
+test('Codex reaches directly connected apps with their token, and writes still need approval',async t=>{
+ const {createServer}=await import('node:http'),{McpServer}=await import('@modelcontextprotocol/sdk/server/mcp.js'),{StreamableHTTPServerTransport}=await import('@modelcontextprotocol/sdk/server/streamableHttp.js'),{z}=await import('zod');
+ const calls=[],auth=[];
+ const app=createServer(async(req,res)=>{if(req.method!=='POST'){res.writeHead(405).end();return;}auth.push(req.headers.authorization);let body='';for await(const chunk of req)body+=chunk;
+  const mcp=new McpServer({name:'fake-calendar',version:'1'});
+  mcp.registerTool('list_events',{description:'List events',inputSchema:{day:z.string()},annotations:{readOnlyHint:true}},async({day})=>{calls.push('list:'+day);return{content:[{type:'text',text:'Standup'}]};});
+  mcp.registerTool('create_event',{description:'Create an event',inputSchema:{title:z.string()}},async({title})=>{calls.push('create:'+title);return{content:[{type:'text',text:'Created'}]};});
+  const transport=new StreamableHTTPServerTransport({sessionIdGenerator:undefined});res.on('close',()=>{void transport.close();void mcp.close();});await mcp.connect(transport);await transport.handleRequest(req,res,JSON.parse(body));});
+ await new Promise(r=>app.listen(0,'127.0.0.1',r));t.after(()=>{app.closeAllConnections();app.close();});
+ const asked=[],directApps={servers:async()=>({app_calendar:{type:'http',url:`http://127.0.0.1:${app.address().port}/mcp`,headers:{Authorization:'Bearer app-token'}}}),isReadOnlyAction:async name=>name==='mcp__app_calendar__list_events'};
+ const runtime=await agentRuntime({bot:{...bot,capabilities:{web:false,computer:false,files:false,connections:true}},conversationId:id,files:new WorkspaceFiles(await directory(t)),connections:{status:()=>({})},directApps,onActivity:()=>{},approve:async name=>{asked.push(name);return false;},signal:new AbortController().signal});
+ const bridge=await createCodexBridge(runtime);t.after(()=>bridge.close());
+ const client=new Client({name:'test',version:'1'});await client.connect(new StreamableHTTPClientTransport(new URL(bridge.url),{requestInit:{headers:{Authorization:'Bearer '+bridge.token}}}));t.after(()=>client.close());
+ assert.deepEqual((await client.listTools()).tools.map(t=>t.name).sort(),['app_calendar__create_event','app_calendar__list_events']);
+ const read=await client.callTool({name:'app_calendar__list_events',arguments:{day:'today'}});assert.equal(read.content[0].text,'Standup');assert.deepEqual(asked,[]);
+ const write=await client.callTool({name:'app_calendar__create_event',arguments:{title:'Lunch'}});assert.equal(write.isError,true);assert.deepEqual(asked,['mcp__app_calendar__create_event']);
+ assert.deepEqual(calls,['list:today']);assert.ok(auth.length&&auth.every(h=>h==='Bearer app-token'));
+});

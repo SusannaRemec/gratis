@@ -42,3 +42,5 @@ main.workspace-open{padding-right:var(--workspace-width,360px)}#work-panel{width
 #computer-screen{touch-action:none;user-select:none;-webkit-user-drag:none}#computer-screen[data-control=human]{cursor:default}
 
 .workspace-file-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.workspace-file-tools input{min-width:100px;flex:1}.workspace-file-tools select,.workspace-file-tools .custom-select{max-width:155px}.workspace-file-tools input,.workspace-file-tools select{box-sizing:border-box}
+
+.direct-app>span:first-child{display:flex;flex-direction:column;gap:2px;min-width:0}.direct-app strong{font-weight:550}.direct-app small{color:var(--muted);font-size:11px;line-height:1.4}.direct-app small.direct-app-error{color:#ef7979}.direct-app-actions{display:flex;gap:6px;flex-shrink:0}.setup-steps{font-size:12px;line-height:1.55;color:var(--muted);padding-left:18px;margin:8px 0}.setup-steps code,#google-redirect{font-size:11px;user-select:all;word-break:break-all}

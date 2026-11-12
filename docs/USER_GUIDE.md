@@ -22,6 +22,8 @@ The app must be running and the computer awake. Closing its window leaves enable
 
 ## Connected apps
 
+**Your apps** (Settings → Connections) signs in to an app’s own MCP server directly, with no broker account. Granola needs only your Granola sign-in. Gmail and Google Calendar use Google’s MCP servers, which are a Developer Preview: join the Google Workspace Developer Preview Program, create a Google Cloud project with the Gmail API, Google Calendar API, `gmailmcp.googleapis.com` and `calendarmcp.googleapis.com` enabled, create a **Web application** OAuth client with **Use this client for an AI-powered agent** ticked and the redirect URI shown in Gratis (`http://127.0.0.1:47823/oauth/callback`), then paste its ID and secret under **Google setup**. Gmail asks only to read mail and create drafts. You can also add any other app’s remote MCP address that supports OAuth sign-in. Tools the app’s server marks read-only run without asking; everything else asks first. If an app’s sign-in expires, scheduled runs skip it and its row shows **Retry**.
+
 Composio sign-in and per-service authorization are optional. You can disconnect or change credentials in Settings. Review the permissions requested by each service. A bot can only use integrations exposed by its enabled runtime.
 
 A connected-app action runs without asking only when Composio labels every step in it as read-only, such as listing calendar events or fetching emails. Anything that creates, changes, sends or deletes still asks you first. So does anything Composio has not labeled, or whose labels Gratis could not check.

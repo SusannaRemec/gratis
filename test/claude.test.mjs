@@ -97,3 +97,16 @@ test('tool hooks expose actual external tool outcomes without changing tool perm
 test('changing recalled data keeps a Claude session warm; privacy changes require fresh context',async t=>{
  const calls=[];let metadata;const reply=setup(args=>{calls.push(args);return success();}),common={bot,settings,workspaceDir:await directory(t),signal:new AbortController().signal,onMetadata:m=>metadata=m};let messages=[{role:'user',content:'Hi'}];await collect(reply({...common,messages,turnContext:'Preference A',contextEpoch:0}));const first=metadata.claudeSession;messages.push({role:'assistant',content:'Hello'},{role:'user',content:'Next'});await collect(reply({...common,messages,claudeSession:first,turnContext:'Preference B',contextEpoch:0}));assert.equal(calls[1].options.resume,sessionId);assert.match(calls[1].prompt,/Preference B/);const second=metadata.claudeSession;messages.push({role:'assistant',content:'Hello'},{role:'user',content:'After forget'});await collect(reply({...common,messages,claudeSession:second,turnContext:'',contextEpoch:1}));assert.equal(calls[2].options.resume,undefined);
 });
+
+test('Claude routes directly connected app tools through the read-only check and approval',async t=>{
+  const {agentRuntime}=await import('../src/agent-tools.mjs');let options;const asked=[];
+  const directApps={servers:async()=>({app_granola:{type:'http',url:'https://mcp.granola.ai/mcp',headers:{Authorization:'Bearer app-token'}}}),isReadOnlyAction:async name=>name==='mcp__app_granola__list_meetings'};
+  const runtime=await agentRuntime({bot:{id:'2b0c8a51-55b4-4d0e-a83a-5f0a0f0d2c11',capabilities:{web:false,files:false,computer:false,connections:true}},conversationId:'test',files:{root:()=>'/private-test'},cloud:{},connections:{status:()=>({composio:false})},directApps,signal:new AbortController().signal,onActivity:()=>{},approve:async name=>{asked.push(name);return false;}});
+  const reply=setup(args=>{options=args.options;return success();});
+  await collect(reply({bot,settings,workspaceDir:await directory(t),messages:[{role:'user',content:'Hi'}],runtime,signal:new AbortController().signal}));
+  assert.deepEqual(options.mcpServers.app_granola.headers,{Authorization:'Bearer app-token'});
+  const signal=new AbortController().signal;
+  assert.equal((await options.canUseTool('mcp__app_granola__list_meetings',{},{signal})).behavior,'allow');assert.deepEqual(asked,[]);
+  assert.equal((await options.canUseTool('mcp__app_granola__delete_note',{},{signal})).behavior,'deny');assert.deepEqual(asked,['mcp__app_granola__delete_note']);
+  assert.equal((await options.canUseTool('mcp__app_Bad__x',{},{signal})).behavior,'deny');assert.equal(asked.length,1,'unknown server names are refused, not prompted');
+});

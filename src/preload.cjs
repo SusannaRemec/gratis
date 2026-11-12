@@ -43,6 +43,7 @@ api.onComputerFrame=cb=>{const listener=(_e,value)=>cb(value);ipcRenderer.on('or
 api.onComputerState=cb=>{const listener=(_e,value)=>cb(value);ipcRenderer.on('orbit:computer-state',listener);return()=>ipcRenderer.removeListener('orbit:computer-state',listener);};
 api.onSignInState=cb=>{const listener=(_e,value)=>cb(value);ipcRenderer.on('orbit:signin-state',listener);return()=>ipcRenderer.removeListener('orbit:signin-state',listener);};
 api.onConnectionsChanged=cb=>{const listener=()=>cb();ipcRenderer.on('orbit:connections-changed',listener);return()=>ipcRenderer.removeListener('orbit:connections-changed',listener);};
+for(const name of ['status','connect','disconnect','cancel','add','google'])api['directApps'+name[0].toUpperCase()+name.slice(1)]=value=>invoke('orbit:direct-apps-'+name,value);
 for(const name of ['view','connect','local','options','threads','project','bind','submit','refresh','retry','stop','send','open'])api['t3'+name[0].toUpperCase()+name.slice(1)]=value=>invoke('orbit:t3-'+name,value);
 api.onT3Changed=cb=>{const listener=()=>cb();ipcRenderer.on('orbit:t3-changed',listener);return()=>ipcRenderer.removeListener('orbit:t3-changed',listener);};
 for(const name of ['view','create','update','remove','run'])api['schedules'+name[0].toUpperCase()+name.slice(1)]=value=>invoke('orbit:schedules-'+name,value);

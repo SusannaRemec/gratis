@@ -3,6 +3,8 @@ import {join} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {Composio} from '@composio/core';
 
+const WRITE_HINTS=['createHint','updateHint','destructiveHint'];
+
 // Credentials never enter workspace snapshots or the renderer.
 export class Connections {
   constructor({directory,encrypt,decrypt,createClient=credential=>new Composio(typeof credential==='string'?{apiKey:credential}:credential)}){this.directory=directory;this.encrypt=encrypt;this.decrypt=decrypt;this.createClient=createClient;this.value={userId:randomUUID()};this.sessionPromise=null;}
@@ -34,5 +36,18 @@ export class Connections {
   }
   async catalog(options={}){const {search='',cursor}=typeof options==='string'?{search:options}:options;const session=await this.session();const result=await session.toolkits({limit:50,...(search?{search:String(search).slice(0,100)}:{}),...(cursor?{cursor:String(cursor)}:{})});return {items:result.items.map(item=>({slug:item.slug,name:item.name,connected:!!item.connection?.isActive,noAuth:item.isNoAuth})),cursor:result.cursor||null};}
   async connect(slug){if(typeof slug!=='string'||!/^[a-z0-9_-]{1,80}$/.test(slug))throw new Error('Choose an app from the list.');const result=await(await this.session()).authorize(slug);const url=new URL(result.redirectUrl);if(url.protocol!=='https:')throw new Error('The provider returned an unsafe sign-in link.');void result.waitForConnection(600000).then(()=>this.onChange?.()).catch(()=>this.onChange?.());return url.href;}
+  // Lets a Composio call skip the approval prompt only when Composio itself tags every app action in it as read-only.
+  // Anything unknown, untagged, write-tagged, or any lookup failure keeps the prompt.
+  async isReadOnlyAction(name,input){
+    if(String(name).replace(/^(mcp__composio__|composio_)/,'')!=='COMPOSIO_MULTI_EXECUTE_TOOL')return false;
+    const items=input?.tools;if(!Array.isArray(items)||!items.length||items.length>50)return false;
+    try{const tags=await Promise.all(items.map(item=>this.toolTags(item?.tool_slug)));return tags.every(t=>t.includes('readOnlyHint')&&!t.some(tag=>WRITE_HINTS.includes(tag)));}catch{return false;}
+  }
+  toolTags(slug){
+    if(typeof slug!=='string'||!/^[A-Za-z0-9_]{1,120}$/.test(slug))return Promise.reject(new Error('Unknown app action.'));
+    const key=slug.toUpperCase();this.tagCache??=new Map();
+    if(!this.tagCache.has(key)){const lookup=(async()=>{const credential=this.value.composioAccount||this.value.composioKey;if(!credential)throw new Error('Composio is not connected.');const tool=await this.createClient(credential).tools.getRawComposioToolBySlug(key);return Array.isArray(tool?.tags)?tool.tags.filter(tag=>typeof tag==='string'):[];})();this.tagCache.set(key,lookup);lookup.catch(()=>this.tagCache.delete(key));}
+    return this.tagCache.get(key);
+  }
   async mcp(){const session=await this.session();const {type,url,headers}=session.mcp;return {type,url,headers};}
 }

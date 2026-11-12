@@ -60,5 +60,5 @@ export async function agentRuntime({bot,conversationId,files,cloud,connections,s
   }
   if(tools.length)mcpServers.gratis=createSdkMcpServer({name:'gratis',version:'1.0.0',tools});
   if(capabilities.connections&&connections.status().composio)mcpServers.composio=await connections.mcp();
-  return {mcpServers,definitions,onActivity,collaboration,memory,t3,schedules,web:capabilities.web,capabilities,workspaceRoot:files.root(bot.id),approve,signature:JSON.stringify({capabilities,participants:collaboration?.members.map(m=>m.id),memory:!!memory,schedules:!!schedules,cloud:connections.status().cloud,composio:connections.status().composio,t3:t3?.binding})};
+  return {mcpServers,definitions,onActivity,collaboration,memory,t3,schedules,web:capabilities.web,capabilities,workspaceRoot:files.root(bot.id),approve:async(name,input)=>(capabilities.connections&&await connections.isReadOnlyAction?.(name,input))||approve(name,input),signature:JSON.stringify({capabilities,participants:collaboration?.members.map(m=>m.id),memory:!!memory,schedules:!!schedules,cloud:connections.status().cloud,composio:connections.status().composio,t3:t3?.binding})};
 }

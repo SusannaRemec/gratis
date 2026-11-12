@@ -24,6 +24,8 @@ The app must be running and the computer awake. Closing its window leaves enable
 
 Composio sign-in and per-service authorization are optional. You can disconnect or change credentials in Settings. Review the permissions requested by each service. A bot can only use integrations exposed by its enabled runtime.
 
+A connected-app action runs without asking only when Composio labels every step in it as read-only, such as listing calendar events or fetching emails. Anything that creates, changes, sends or deletes still asks you first. So does anything Composio has not labeled, or whose labels Gratis could not check.
+
 ## Computer and takeover
 
 With your own cloud backend configured, the Computer pane shows the bot's browser. Drag the divider to resize it, or expand it. Take control to use its mouse and keyboard; Give control back resumes unfinished work from a fresh view of the page. Save important files before stopping the computer. This computer is separate from the Mac running Gratis.

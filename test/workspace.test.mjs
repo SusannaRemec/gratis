@@ -36,3 +36,13 @@ test('manual control prevents agent computer actions until the user returns cont
  const runtime=await agentRuntime({bot:{id:'345fe4b3-f4f7-442e-a456-68559388fc7e',capabilities:{web:false,files:false,computer:true,connections:false}},conversationId:'test',files:{root:()=>'/private-test'},cloud:{execute:async()=>{calls++;return{output:'ready'};}},connections:{status:()=>({cloud:true})},signal:new AbortController().signal,onActivity:()=>{},approve:async()=>false,canUseComputer:()=>!human});
  const computer=runtime.definitions.find(t=>t.name==='computer');const denied=await computer.handler({action:'capture_screen',args:{}});assert.equal(denied.isError,true);assert.equal(calls,0);human=false;const allowed=await computer.handler({action:'capture_screen',args:{}});assert.ok(!allowed.isError);assert.equal(calls,1);
 });
+
+test('bot runtime skips the prompt only for read-only connected-app calls',async()=>{
+ const {agentRuntime}=await import('../src/agent-tools.mjs');const asked=[];
+ const connections={status:()=>({composio:true,cloud:false}),mcp:async()=>({type:'http',url:'https://example.invalid/mcp'}),isReadOnlyAction:async(name,input)=>input?.tools?.[0]?.tool_slug==='GMAIL_FETCH_EMAILS'};
+ const make=enabled=>agentRuntime({bot:{id:'345fe4b3-f4f7-442e-a456-68559388fc7e',capabilities:{web:false,files:false,computer:false,connections:enabled}},conversationId:'test',files:{root:()=>'/private-test'},cloud:{},connections,signal:new AbortController().signal,onActivity:()=>{},approve:async name=>{asked.push(name);return false;}});
+ const runtime=await make(true),read={tools:[{tool_slug:'GMAIL_FETCH_EMAILS',arguments:{}}]},send={tools:[{tool_slug:'GMAIL_SEND_EMAIL',arguments:{}}]};
+ assert.equal(await runtime.approve('mcp__composio__COMPOSIO_MULTI_EXECUTE_TOOL',read),true);assert.deepEqual(asked,[]);
+ assert.equal(await runtime.approve('mcp__composio__COMPOSIO_MULTI_EXECUTE_TOOL',send),false);assert.equal(asked.length,1);
+ assert.equal(await (await make(false)).approve('mcp__composio__COMPOSIO_MULTI_EXECUTE_TOOL',read),false);assert.equal(asked.length,2);
+});

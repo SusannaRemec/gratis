@@ -3,6 +3,7 @@ import {createSdkMcpServer,tool} from '@anthropic-ai/claude-agent-sdk';
 import {z} from 'zod';
 import {COMPUTER_ACTIONS} from './cloud-computer.mjs';
 import {searchWeb,readWebpage,publicURL} from './web-tools.mjs';
+import {COMPOSIO_APP,allowedApps} from './bot-apps.mjs';
 
 export const defaultCapabilities={web:true,files:true,computer:true,connections:true};
 export async function agentRuntime({bot,conversationId,files,cloud,connections,directApps,signal,onActivity,approve,collaboration,memory,t3,schedules,requestComputerHelp,canUseComputer=()=>true}) {
@@ -59,7 +60,10 @@ export async function agentRuntime({bot,conversationId,files,cloud,connections,d
     if(capabilities.files&&collaboration.share)register('share_file','Copy a file from your workspace to another selected teammate. Returns the actual recipient path to include in ask_agent. Use this before asking a teammate to review a document or image; their private Files are separate.',{toBotId:z.enum(peers.map(p=>p.id)),path:z.string()},async input=>text(await collaboration.share(input)));
   }
   if(tools.length)mcpServers.gratis=createSdkMcpServer({name:'gratis',version:'1.0.0',tools});
-  if(capabilities.connections&&connections.status().composio)mcpServers.composio=await connections.mcp();
-  if(capabilities.connections&&directApps)Object.assign(mcpServers,await directApps.servers());
-  return {mcpServers,definitions,onActivity,collaboration,memory,t3,schedules,web:capabilities.web,capabilities,workspaceRoot:files.root(bot.id),approve:async(name,input)=>(capabilities.connections&&(await connections.isReadOnlyAction?.(name,input)||await directApps?.isReadOnlyAction(name)))||approve(name,input),signature:JSON.stringify({capabilities,participants:collaboration?.members.map(m=>m.id),memory:!!memory,schedules:!!schedules,cloud:connections.status().cloud,composio:connections.status().composio,apps:Object.keys(mcpServers).filter(k=>k.startsWith('app_')),t3:t3?.binding})};
+  const appKeys=[];
+  if(capabilities.connections){
+    const direct=directApps?await directApps.servers():{},byApp={...(connections.status().composio?{[COMPOSIO_APP]:'composio'}:{}),...Object.fromEntries(Object.keys(direct).map(key=>[key.replace(/^app_/,''),key]))};
+    for(const id of allowedApps(bot,Object.keys(byApp))){const key=byApp[id];appKeys.push(key);mcpServers[key]=key==='composio'?await connections.mcp():direct[key];}
+  }
+  return {mcpServers,definitions,onActivity,collaboration,memory,t3,schedules,web:capabilities.web,capabilities,workspaceRoot:files.root(bot.id),approve:async(name,input)=>(appKeys.some(key=>name.startsWith(`mcp__${key}__`))&&(await connections.isReadOnlyAction?.(name,input)||await directApps?.isReadOnlyAction(name)))||approve(name,input),signature:JSON.stringify({capabilities,participants:collaboration?.members.map(m=>m.id),memory:!!memory,schedules:!!schedules,cloud:connections.status().cloud,composio:connections.status().composio,apps:appKeys,t3:t3?.binding})};
 }

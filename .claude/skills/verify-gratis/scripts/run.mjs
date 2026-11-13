@@ -101,10 +101,10 @@ const journeys={
   assert.ok(await page.locator('#bot-apps').isVisible()&&!await row('Verify Mail').isChecked(),'list returns with the choice intact');
   await row('Verify Mail').check();
   await save();step('saved every app');
-  assert.ok(!('apps' in await bot()),'choosing every connected app stores no field');
-  assert.ok(!('apps' in (await workspace()).bots[0]),'workspace.json holds no apps field');
+  assert.deepEqual((await bot()).apps,['custom_verify_notes','custom_verify_mail'],'a narrowed bot keeps an explicit list when every app is ticked again');
+  assert.deepEqual((await workspace()).bots[0].apps,['custom_verify_notes','custom_verify_mail'],'explicit list persisted to workspace.json');
   assert.equal((await bot()).capabilities?.connections,true,'master switch untouched');
-  return {saved:['custom_verify_notes','all']};
+  return {saved:[['custom_verify_notes'],['custom_verify_notes','custom_verify_mail']]};
  },
  async 'bot-apps-empty'({page,capture,step,workspace}){
   await openChat(page);

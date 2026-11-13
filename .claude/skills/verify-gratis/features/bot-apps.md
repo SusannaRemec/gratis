@@ -5,7 +5,7 @@ A user opens a bot's settings and picks which connected apps that bot may use. T
 ## Sub-features
 
 - `bot-apps-list` lists each connected app by name under Connected apps, all ticked when the bot has no selection.
-- `bot-apps-save` unticks an app, saves, and reopens to find the choice kept. Ticking every app again stores no selection.
+- `bot-apps-save` unticks an app, saves, and reopens to find the choice kept. Ticking every app again keeps an explicit list, so a narrowed bot never picks up a new app by itself.
 - `bot-apps-switch` hides the list while Connected apps is unticked and restores it with the choice intact.
 - `bot-apps-empty` shows one line pointing to Settings, Connections when no app is connected.
 - `bot-apps-composio` lists Composio first when signed in. Not scripted, because Composio must never be configured here. Selection logic is covered by `test/bot-apps.test.mjs`.

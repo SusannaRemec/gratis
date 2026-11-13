@@ -259,14 +259,14 @@ $('sidebar-resize').onpointerdown = e => { sidebarDrag = e.clientX; e.currentTar
 $('sidebar-resize').onpointermove = e => { if(sidebarDrag !== null) document.documentElement.style.setProperty('--sidebar-width',`${Math.max(240,Math.min(400,e.clientX))}px`); };
 $('sidebar-resize').onpointerup = () => { sidebarDrag=null; };
 $('sidebar-resize').onpointercancel = () => { sidebarDrag=null; };
-let appIds=null;
+let appIds=null,appsBefore,appsLoad=0;
 async function paintBotApps(bot){
-  appIds=null;$('bot-apps').replaceChildren();
+  appIds=null;$('bot-apps').replaceChildren();const load=++appsLoad;
   try{
-    const [status,direct]=await Promise.all([api.connections(),api.directAppsStatus()]);if(editingBot!==bot?.id)return;
+    const [status,direct]=await Promise.all([api.connections(),api.directAppsStatus()]);if(load!==appsLoad)return;
     const apps=connectedApps(status.composio,direct.apps),on=allowedApps(bot,apps.map(a=>a.id));
     $('bot-apps').replaceChildren(...(apps.length?apps.map(app=>{const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=app.id;input.checked=on.includes(app.id);label.append(input,app.name);return label;}):[Object.assign(document.createElement('p'),{className:'field-note',textContent:'No apps connected. Connect one in Settings, Connections.'})]));
-    appIds=apps.map(a=>a.id);
+    appIds=apps.map(a=>a.id);appsBefore=bot?.apps;
   }catch{}
 }
 $('bot-connections').onchange=()=>{$('bot-apps').hidden=!$('bot-connections').checked;};
@@ -282,7 +282,7 @@ function openBotDialog(edit = true) {
 const createBot = setupCreateBot({api,onCreated:next=>{homeVisible=false;workspaceUI?.hideForHome();render(next);$('messages').scrollTop=$('messages').scrollHeight;$('prompt').focus();}});
 $('new-bot').onclick = async () => {await flushDraft();voiceInput?.cancel();selects.close();createBot.open();}; $('edit-bot').onclick = () => {if(!threadUI?.showDetails())openBotDialog(true);};
 $('bot-form').onsubmit = async e => { e.preventDefault(); const value = { name: $('bot-title').value.trim(), instructions: $('bot-system').value, userPromptTemplate: $('bot-user-template').value, [state.settings.provider==='codex'?'codexModel':'model']:$('bot-model').value, memory:$('bot-memory').value, capabilities:Object.fromEntries(['web','files','computer','connections'].map(key=>[key,$('bot-'+key).checked])) };
-  if(editingBot&&appIds)value.apps=chosenApps([...$('bot-apps').querySelectorAll('input:checked')].map(i=>i.value),appIds);
+  if(editingBot&&appIds)value.apps=chosenApps([...$('bot-apps').querySelectorAll('input:checked')].map(i=>i.value),appIds,appsBefore);
   if (value.userPromptTemplate.trim() && !value.userPromptTemplate.includes('{{message}}')) { $('bot-user-template').setCustomValidity('Include {{message}} where your message should go.'); $('bot-user-template').reportValidity(); return; }
   if (editingBot) value.id = editingBot;
   await flushDraft(); const result = await run(() => editingBot ? api.updateBot(value) : api.createBot(value));

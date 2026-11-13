@@ -20,7 +20,7 @@ export async function createCodexBridge(runtime){
       do{const page=await remote.listTools(cursor?{cursor}:{});for(const t of page.tools)definitions.push({name:(prefix+t.name).replace(/[^A-Za-z0-9_-]/g,'_').slice(0,128),description:t.description||t.name,schema:z.fromJSONSchema(t.inputSchema),handler:async input=>{
         const id=randomUUID(),name=prefix+t.name;runtime.onActivity?.({id,name,input:traceValue(input),status:'running',startedAt:Date.now()});
         const discovery=key==='composio'&&['COMPOSIO_SEARCH_TOOLS','COMPOSIO_GET_TOOL_SCHEMAS'].includes(t.name);
-        try{if(!discovery&&!await runtime.approve(key==='composio'?t.name:`mcp__${key}__${t.name}`,input)){runtime.onActivity?.({id,name,status:'denied',finishedAt:Date.now()});return {isError:true,content:[{type:'text',text:'The user declined this action.'}]};}
+        try{if(!discovery&&!await runtime.approve(`mcp__${key}__${t.name}`,input)){runtime.onActivity?.({id,name,status:'denied',finishedAt:Date.now()});return {isError:true,content:[{type:'text',text:'The user declined this action.'}]};}
         const result=await remote.callTool({name:t.name,arguments:input});runtime.onActivity?.({id,name,status:result.isError?'error':'complete',result:toolResultCheckpoint(result),finishedAt:Date.now()});return result;}catch(error){runtime.onActivity?.({id,name,status:'error',detail:String(error.message),finishedAt:Date.now()});throw error;}
       }});cursor=page.nextCursor;}while(cursor);
     }

@@ -88,10 +88,10 @@ test('imported lines that share a label stay separate current memories',async t=
  const{s,memory}=await fixture(t);const c=await turn(s,'Hello there'),stem='I like long walks along the river near my house in the early ';
  assert.equal((await memory.importMemories(c.id,[{content:stem+'spring'},{content:stem+'autumn'}])).added,2);const v=await memory.view(c.id);assert.equal(v.profile.length,2);assert.equal(v.history.length,0);
 });
-test('credential-like lines are never stored while their neighbours still are',async t=>{
- const{s,memory}=await fixture(t);const c=await turn(s,'Hello there'),lines=['API key: sk-test0123456789abcdefghij','Authorization Bearer abcdefghijklmnopqrstuvwxyz0123','password = hunter2xyz','Likes tea'];
- assert.deepEqual(await memory.importMemories(c.id,lines.map(content=>({content}))),{added:1,skipped:0,withheld:3});assert.deepEqual((await memory.view(c.id)).profile.map(r=>r.content),['Likes tea']);
- const stored=JSON.stringify(memory.vault.state);for(const secret of ['sk-test0123','abcdefghijklmnop','hunter2xyz'])assert.ok(!stored.includes(secret));
+test('credential-like and private lines are never stored while their neighbours still are',async t=>{
+ const{s,memory}=await fixture(t);const c=await turn(s,'Hello there'),lines=['API key: sk-test0123456789abcdefghij','Authorization Bearer abcdefghijklmnopqrstuvwxyz0123','password = hunter2xyz','The login password is swordfish42','Was diagnosed with asthma last year','Likes tea'];
+ assert.deepEqual(await memory.importMemories(c.id,lines.map(content=>({content}))),{added:1,skipped:0,withheld:5});assert.deepEqual((await memory.view(c.id)).profile.map(r=>r.content),['Likes tea']);
+ const stored=JSON.stringify(memory.vault.state);for(const secret of ['sk-test0123','abcdefghijklmnop','hunter2xyz','swordfish42','asthma'])assert.ok(!stored.includes(secret));
 });
 test('a caller cannot steer an import into another scope, status or label',async t=>{
  const{s,memory}=await fixture(t);const c=await turn(s,'Hello there');
@@ -108,6 +108,11 @@ test('a paused or unreachable memory refuses an import and stores nothing',async
  const{s,memory,directory,keys}=await fixture(t);const c=await turn(s,'Hello there'),items=parseMemoryImport(pasted);
  await memory.enable(false);await assert.rejects(memory.importMemories(c.id,items),/turned off/);assert.equal(memory.vault.state.facts.length,0);await memory.enable(true);assert.equal((await memory.importMemories(c.id,items)).added,3);
  await memory.vault.tail;await writeFile(join(directory,'memory.secure'),Buffer.from('not a vault'));const broken=await new MemoryService({directory,...keys}).init();assert.equal(broken.status,'unavailable');await assert.rejects(broken.importMemories(c.id,items),/could not be opened/);
+});
+test('pausing memory partway through an import stops it, and importing again finishes the rest',async t=>{
+ const{s,memory}=await fixture(t);const c=await turn(s,'Hello there'),items=parseMemoryImport(pasted);
+ const running=memory.importMemories(c.id,items);await memory.enable(false);await assert.rejects(running,/stopped/);assert.ok(memory.vault.state.facts.length<3);
+ await memory.enable(true);const rest=await memory.importMemories(c.id,items);assert.equal(rest.added+rest.skipped,3);assert.equal((await memory.view(c.id)).profile.length,3);
 });
 test('an unknown conversation is refused even when every line would be skipped',async t=>{
  const{s,memory}=await fixture(t);const c=await turn(s,'Hello there');await memory.importMemories(c.id,[{content:'Likes tea'}]);

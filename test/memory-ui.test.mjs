@@ -24,9 +24,9 @@ test('review shows pasted markup as plain text and saves only the ticked lines w
  await m.save();await settle();
  assert.deepEqual(m.calls.saved,[{conversationId:'c1',items:[{content:'<img src=x onerror=alert(1)>'},{content:'Lives in Porto'}]}]);assert.equal(m.notice().textContent,'Added 2 memories. Skipped 0 duplicates.');assert.equal(m.panelOpen(),false);assert.ok(m.calls.views.length>=2);
 });
-test('the result says how many lines were duplicates or left out as credentials',async()=>{
+test('the result says how many lines were duplicates or left out as private',async()=>{
  const m=await mount({save:()=>({added:1,skipped:1,withheld:2})});await m.open();m.paste('- Likes tea\n- Lives in Lisbon\n- Works nights\n- Has two cats');await m.save();await settle();
- assert.equal(m.notice().textContent,'Added 1 memory. Skipped 1 duplicate. Left out 2 lines that looked like a password or key.');
+ assert.equal(m.notice().textContent,'Added 1 memory. Skipped 1 duplicate. Left out 2 lines that looked private. Add those yourself with Add a memory if you want them kept.');
 });
 test('a refused save keeps the review open with the reason so it can be retried',async()=>{
  let refuse=true;const m=await mount({save:value=>{if(refuse)throw new Error('Memory is turned off. Turn it on to import.');return{added:value.items.length,skipped:0,withheld:0};}});await m.open();m.paste('- Likes tea\n- Lives in Lisbon');

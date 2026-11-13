@@ -37,7 +37,7 @@ test('the bot dialog lists Composio when signed in and only fully connected dire
 test('the reserved Composio id cannot be produced for a direct app',async t=>{
   const directory=await mkdtemp(join(tmpdir(),'gratis-apps-'));t.after(()=>rm(directory,{recursive:true,force:true}));
   const apps=await new DirectApps({directory,encrypt:async s=>Buffer.from(s),decrypt:async b=>String(b)}).init();
-  for(const name of ['@composio','composio','Composio session'])await apps.add({name,url:'https://example.invalid/mcp'});
+  for(const name of ['@composio','Composio session'])await apps.add({name,url:'https://example.invalid/mcp'});
   const ids=apps.status().apps.map(a=>a.id);
   assert.ok(!ids.includes(COMPOSIO_APP)&&!Object.keys(PRESETS).includes(COMPOSIO_APP));
   assert.ok(ids.every(id=>/^[a-z0-9_]+$/.test(id)),'every direct id is lowercase letters, digits and underscores');

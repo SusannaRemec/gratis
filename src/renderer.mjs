@@ -15,6 +15,7 @@ import { createBotTile } from './bot-tile.mjs';
 import { setupVoiceInput } from './voice-ui.mjs';
 import { setupCreateBot } from './create-bot-ui.mjs';
 import { setupSelects } from './select-ui.mjs';
+import {allowedApps,chosenApps,connectedApps} from './bot-apps.mjs';
 const $ = id => document.getElementById(id);
 const api = window.orbit;
 const selects = setupSelects();
@@ -258,18 +259,30 @@ $('sidebar-resize').onpointerdown = e => { sidebarDrag = e.clientX; e.currentTar
 $('sidebar-resize').onpointermove = e => { if(sidebarDrag !== null) document.documentElement.style.setProperty('--sidebar-width',`${Math.max(240,Math.min(400,e.clientX))}px`); };
 $('sidebar-resize').onpointerup = () => { sidebarDrag=null; };
 $('sidebar-resize').onpointercancel = () => { sidebarDrag=null; };
+let appIds=null;
+async function paintBotApps(bot){
+  appIds=null;$('bot-apps').replaceChildren();
+  try{
+    const [status,direct]=await Promise.all([api.connections(),api.directAppsStatus()]);if(editingBot!==bot?.id)return;
+    const apps=connectedApps(status.composio,direct.apps),on=allowedApps(bot,apps.map(a=>a.id));
+    $('bot-apps').replaceChildren(...(apps.length?apps.map(app=>{const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=app.id;input.checked=on.includes(app.id);label.append(input,app.name);return label;}):[Object.assign(document.createElement('p'),{className:'field-note',textContent:'No apps connected. Connect one in Settings, Connections.'})]));
+    appIds=apps.map(a=>a.id);
+  }catch{}
+}
+$('bot-connections').onchange=()=>{$('bot-apps').hidden=!$('bot-connections').checked;};
 function openBotDialog(edit = true) {
   voiceInput?.cancel(); selects.close();
   editingBot = edit ? currentBot().id : null; const bot = edit ? currentBot() : null;
   $('bot-dialog-title').textContent = edit ? 'Edit bot' : 'Create a bot'; $('save-bot').textContent = edit ? 'Save bot' : 'Create bot';
   $('bot-title').value = bot?.name || ''; $('bot-system').value = bot?.instructions || '';
   $('bot-user-template').value = bot?.userPromptTemplate || '{{message}}'; $('bot-user-template').setCustomValidity('');
-  fillModels($('bot-model'),modelsForProvider(),state.settings.provider==='codex'?bot?.codexModel||'':bot?.model||'',true); $('bot-memory').value=bot?.memory||''; for(const key of ['web','files','computer','connections'])$('bot-'+key).checked=bot?.capabilities?.[key]!==false;
+  fillModels($('bot-model'),modelsForProvider(),state.settings.provider==='codex'?bot?.codexModel||'':bot?.model||'',true); $('bot-memory').value=bot?.memory||''; for(const key of ['web','files','computer','connections'])$('bot-'+key).checked=bot?.capabilities?.[key]!==false;$('bot-apps').hidden=!$('bot-connections').checked;void paintBotApps(bot);
   $('avatar-controls').hidden = !edit; $('bot-dialog').showModal(); selects.sync(); $('bot-title').focus();
 }
 const createBot = setupCreateBot({api,onCreated:next=>{homeVisible=false;workspaceUI?.hideForHome();render(next);$('messages').scrollTop=$('messages').scrollHeight;$('prompt').focus();}});
 $('new-bot').onclick = async () => {await flushDraft();voiceInput?.cancel();selects.close();createBot.open();}; $('edit-bot').onclick = () => {if(!threadUI?.showDetails())openBotDialog(true);};
 $('bot-form').onsubmit = async e => { e.preventDefault(); const value = { name: $('bot-title').value.trim(), instructions: $('bot-system').value, userPromptTemplate: $('bot-user-template').value, [state.settings.provider==='codex'?'codexModel':'model']:$('bot-model').value, memory:$('bot-memory').value, capabilities:Object.fromEntries(['web','files','computer','connections'].map(key=>[key,$('bot-'+key).checked])) };
+  if(editingBot&&appIds)value.apps=chosenApps([...$('bot-apps').querySelectorAll('input:checked')].map(i=>i.value),appIds);
   if (value.userPromptTemplate.trim() && !value.userPromptTemplate.includes('{{message}}')) { $('bot-user-template').setCustomValidity('Include {{message}} where your message should go.'); $('bot-user-template').reportValidity(); return; }
   if (editingBot) value.id = editingBot;
   await flushDraft(); const result = await run(() => editingBot ? api.updateBot(value) : api.createBot(value));

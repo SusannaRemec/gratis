@@ -129,3 +129,13 @@ test('imports survive a restart and importing the same text afterwards still add
  const reopened=await new MemoryService({directory,...keys}).init(),next=new ChatService({dataDir:directory,memory:reopened,backend:async function*(){yield 'Done';}});await next.init();
  assert.equal((await reopened.view(c.id)).profile.length,3);assert.deepEqual(await reopened.importMemories(c.id,items),{added:0,skipped:3,withheld:0});assert.equal((await reopened.view(c.id)).profile.length,3);await next.close();
 });
+test('forgetting one imported memory leaves the chat it was imported from intact',async t=>{
+ const{s,memory}=await fixture(t);const c=await turn(s,'Hello there'),usable=()=>memory.messages(s._conversation(c.id)).length,before=usable();assert.ok(before>0);
+ await memory.importMemories(c.id,[{content:'Likes tea'},{content:'Lives in Lisbon'},{content:'Works nights'}]);const [first]=(await memory.view(c.id)).profile;
+ await memory.remove(c.id,first.id);assert.equal(usable(),before);assert.equal((await memory.view(c.id)).profile.length,2);
+});
+test('a large import does not crowd a learned memory out of the prompt',async t=>{
+ const{s,memory}=await fixture(t);const c=await turn(s,'I prefer concise explanations.');await memory.learn(c.id,input(c.messages[0]));const learned=(await memory.view(c.id)).profile[0].content;
+ await memory.importMemories(c.id,Array.from({length:30},(_,i)=>({content:`Imported detail number ${i} about gardening`})));
+ const packet=(await memory.contextPacket(c.id,'What is the weather tomorrow?')).context;assert.ok(packet.includes(learned));assert.match(packet,/Imported detail/);
+});

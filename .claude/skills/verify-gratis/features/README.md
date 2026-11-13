@@ -34,4 +34,5 @@ Each feature file has an H1 title, one paragraph of user-visible behavior, then 
 - [Create a bot](./create-bot.md) covers the create dialog, naming, and the new bot in the sidebar. Journeys `create-bot` and `create-first-bot`.
 - [Choose connected apps per bot](./bot-apps.md) covers the app list in the bot dialog, the saved choice, and its empty state. Journeys `bot-apps` and `bot-apps-empty`.
 - [Scheduled tasks](./schedules.md) covers creating a schedule from the composer menu and its encrypted storage. Journey `schedules`.
+- [Import memories](./memory-import.md) covers pasting another assistant's memories, reviewing them, saving, and the repeat that adds nothing. Journey `memory-import`.
 - [Settings and provider](./settings.md) covers opening Settings and confirming the provider, read-only. No journey yet.

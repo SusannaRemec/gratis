@@ -57,6 +57,54 @@ const journeys={
   assert.ok(!stored.includes(title),'schedule stored encrypted, title not in plaintext');
   return {title,storedBytes:stored.length};
  },
+ async 'memory-import'({page,capture,step,profile}){
+  const pasted='# What I remember\n- Likes tea\n- Lives in Lisbon\n  and works nights\n- likes TEA\n- Prefers concise answers\n- Walks to work';
+  const edited='Prefers concise answers with the result first';
+  const view=()=>page.evaluate(async()=>{const s=await window.orbit.snapshot();return window.orbit.memoryView({conversationId:s.activeConversationId});});
+  const rowsOf=()=>page.locator('#memory-import-rows .memory-import-row');
+  const importOnce=async(label,result)=>{
+   await page.locator('#memory-import').click();
+   await page.locator('#memory-import-text').fill(pasted);
+   await page.locator('#memory-import-review').click();
+   await rowsOf().first().waitFor();
+   assert.deepEqual(await rowsOf().locator('textarea').evaluateAll(a=>a.map(x=>x.value)),['Likes tea','Lives in Lisbon and works nights','Prefers concise answers','Walks to work'],'review lists each distinct line once, with the wrapped line joined');
+   assert.equal(await page.locator('#memory-import-save').innerText(),'Save 4','every candidate starts ticked');
+   await rowsOf().nth(3).locator('input').uncheck();
+   await rowsOf().nth(2).locator('textarea').fill(edited);
+   assert.equal(await page.locator('#memory-import-save').innerText(),'Save 3','count follows the ticks');
+   await page.locator('#memory-import-save').scrollIntoViewIfNeeded();
+   await capture(label);
+   await page.locator('#memory-import-save').click();
+   await page.locator('.memory-notice',{hasText:result}).waitFor();
+   await page.locator('#memory-import-panel').waitFor({state:'hidden'});
+  };
+  await openChat(page);
+  await page.locator('#show-memory').click();
+  await page.locator('#memory-import').waitFor({state:'visible'});
+  assert.equal((await view()).profile.length,0,'memory starts empty');
+  await capture('memory-panel');
+  await page.locator('#memory-import').click();
+  await page.locator('#memory-import-text').fill(pasted);
+  await capture('paste');
+  await page.locator('#memory-import-panel').getByRole('button',{name:'Cancel'}).click();
+  await page.locator('#memory-import-panel').waitFor({state:'hidden'});
+  await importOnce('review-first-import','Added 3 memories. Skipped 0 duplicates.');
+  step('first import saved');
+  await capture('first-import-saved');
+  const first=await view();
+  assert.deepEqual(first.profile.map(r=>r.content).sort(),['Likes tea','Lives in Lisbon and works nights',edited].sort(),'exactly the kept lines, with the edit, are stored');
+  assert.ok(first.profile.every(r=>r.scope==='profile'&&r.status==='confirmed'),'stored as confirmed profile memories');
+  assert.equal(first.pending.length,0,'nothing waits for review');
+  assert.equal(await page.locator('#memory-list .memory-item').count(),3,'the About you list shows the three memories');
+  const stored=await readFile(path.join(profile,'memory.secure'));
+  assert.ok(!stored.includes(Buffer.from('Lisbon')),'memory.secure holds no plaintext');
+  await importOnce('review-second-import','Added 0 memories. Skipped 3 duplicates.');
+  step('second import skipped everything');
+  await capture('second-import-nothing-added');
+  const second=await view();
+  assert.deepEqual(second.profile,first.profile,'importing the same text again changed nothing');
+  return {kept:first.profile.length,revision:{first:first.revision,second:second.revision}};
+ },
  async 'create-bot'({page,capture,step,workspace}){
   const name=`Verify Bot ${Date.now()%100000}`;
   await page.locator('#new-bot').click();

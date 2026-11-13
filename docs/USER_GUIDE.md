@@ -26,6 +26,8 @@ The app must be running and the computer awake. Closing its window leaves enable
 
 Composio sign-in and per-service authorization are optional. You can disconnect or change credentials in Settings. Review the permissions requested by each service. A bot can only use integrations exposed by its enabled runtime.
 
+Each bot chooses which connected apps it may use. Open the bot’s settings and look under **Connected apps**: every app you have connected is listed, with Composio first when you are signed in. New bots, and bots you have not changed, may use all of them, including apps you connect later. Untick an app and that bot cannot use it at all. Turning **Connected apps** off hides the list and blocks every app. If nothing is connected, the list points you to Settings → Connections. Slack conversations without tool access never use connected apps.
+
 A connected-app action runs without asking only when Composio labels every step in it as read-only, such as listing calendar events or fetching emails. Anything that creates, changes, sends or deletes still asks you first. So does anything Composio has not labeled, or whose labels Gratis could not check.
 
 ## Computer and takeover

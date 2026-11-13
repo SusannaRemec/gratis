@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {assertStorageCompatible, createCheckpoint} from './storage-safety.mjs';
 import {validateRunLimits} from './run-limits.mjs';
+import {validApps} from './bot-apps.mjs';
 
 export const DEFAULT_SETTINGS = Object.freeze({ provider: 'demo', baseUrl: 'http://127.0.0.1:11434/v1', model: '', effort: 'medium', voiceCleanup: true, voiceLanguage: 'en', displayName: '', profileAvatarDataUrl: null });
 export function initialState() {
@@ -27,6 +28,7 @@ export function validState(s) {
     if(b.memoryProfileAccess!==undefined&&typeof b.memoryProfileAccess!=='boolean')return false;
     if (b.memory !== undefined && (typeof b.memory !== 'string' || b.memory.length>16000)) return false;
     if (b.capabilities !== undefined && (!b.capabilities || Object.entries(b.capabilities).some(([k,v])=>!['web','files','computer','connections'].includes(k)||typeof v!=='boolean'))) return false;
+    if (b.apps !== undefined && !validApps(b.apps)) return false;
     if (b.promptMode !== undefined && !['auto','manual'].includes(b.promptMode)) return false;
     if (b.avatarShape !== undefined && typeof b.avatarShape !== 'string') return false;
     if (b.avatarColor !== undefined && typeof b.avatarColor !== 'string') return false;

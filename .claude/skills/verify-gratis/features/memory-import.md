@@ -6,7 +6,7 @@ A user pastes what another assistant remembered about them into the Memory panel
 
 - `memory-import-open` opens the paste box from Import. With Memory turned off it explains why instead of opening.
 - `memory-import-review` lists one editable, ticked line per candidate. Headings, list markers, quotes and repeated lines are removed and a wrapped line is joined to its item.
-- `memory-import-save` saves the ticked, edited lines and reports how many were added and skipped. Credential-like lines are left out and counted.
+- `memory-import-save` saves the ticked, edited lines and reports how many were added and skipped. Lines that look private, such as a credential or a health detail, are left out and counted.
 - `memory-import-repeat` imports the same text again and adds nothing.
 - `memory-import-limits` refuses text over 60,000 characters, more than 200 items, or a line over 1,000 characters. Covered by `test/memory-import.test.mjs` and `test/memory-ui.test.mjs`, not scripted.
 - `memory-import-paused` shows the Memory-is-off message. Not scripted, because pausing Memory in a profile is covered by `test/memory-service.test.mjs`.

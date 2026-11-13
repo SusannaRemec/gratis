@@ -35,7 +35,7 @@ export function setupMemoryUI({container,api,getState,onOpenSource=()=>{},onChan
  importSave.onclick=async()=>{
   const run=++importRun,items=kept(),count=(n,one,many)=>`${n} ${n===1?one:many}`;importError.hidden=true;importStep('saving');let result;
   try{result=await api.memoryImport({conversationId:id(),items});}catch(error){if(run===importRun){importFail(error.message||String(error));importStep('review');}else fail(error);return;}
-  notice.textContent=`Added ${count(result.added,'memory','memories')}. Skipped ${count(result.skipped,'duplicate','duplicates')}.${result.withheld?` Left out ${count(result.withheld,'line','lines')} that looked like a password or key.`:''}`;notice.hidden=false;if(run===importRun)importStep('closed');await refresh();onChange();
+  notice.textContent=`Added ${count(result.added,'memory','memories')}. Skipped ${count(result.skipped,'duplicate','duplicates')}.${result.withheld?` Left out ${count(result.withheld,'line','lines')} that looked private. Add those yourself with Add a memory if you want them kept.`:''}`;notice.hidden=false;if(run===importRun)importStep('closed');await refresh();onChange();
  };
  learnBox.onchange=()=>void perform(()=>api.memoryEnable({conversationId:id(),enabled:learnBox.checked}));
  accessBox.onchange=()=>void perform(()=>api.updateBot({id:view.context.botId,memoryProfileAccess:accessBox.checked}));

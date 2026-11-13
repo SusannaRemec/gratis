@@ -40,7 +40,7 @@ export class MemoryService{
   if(texts.some(text=>!text||text.length>IMPORT_LIMITS.itemChars))throw new Error(`Each memory needs 1 to ${IMPORT_LIMITS.itemChars} characters.`);
   this.context(conversationId,{view:true});const generation=this.vault.state.privacyRevision,known=new Set(this.vault.state.facts.filter(r=>r.scope==='profile').map(r=>importKey(r.content))),counts={added:0,skipped:0,withheld:0};
   for(const content of texts){
-   const same=importKey(content);if(safeMemoryText(content)!==content){counts.withheld++;continue;}if(known.has(same)){counts.skipped++;continue;}
+   const same=importKey(content);if(safeMemoryText(content)!==content||sensitiveMemory(content)){counts.withheld++;continue;}if(known.has(same)){counts.skipped++;continue;}
    const result=await this.learn(conversationId,{key:'import_'+createHash('sha256').update(same).digest('hex').slice(0,16),title:memoryLabel(content),content,scope:'profile'},{manual:true,generation});
    if(result.status==='cancelled')throw new Error('Import stopped because memory or this chat changed. Importing again finishes the rest.');known.add(same);counts[result.status==='confirmed'?'added':'skipped']++;
   }

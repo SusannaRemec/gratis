@@ -32,5 +32,6 @@ Each feature file has an H1 title, one paragraph of user-visible behavior, then 
 
 - [Send a chat message](./chat.md) covers composing, sending, the streamed demo reply, and persistence. Journey `chat`.
 - [Create a bot](./create-bot.md) covers the create dialog, naming, and the new bot in the sidebar. Journeys `create-bot` and `create-first-bot`.
+- [Choose connected apps per bot](./bot-apps.md) covers the app list in the bot dialog, the saved choice, and its empty state. Journeys `bot-apps` and `bot-apps-empty`.
 - [Scheduled tasks](./schedules.md) covers creating a schedule from the composer menu and its encrypted storage. Journey `schedules`.
 - [Settings and provider](./settings.md) covers opening Settings and confirming the provider, read-only. No journey yet.

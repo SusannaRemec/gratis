@@ -5,7 +5,7 @@ import path from 'node:path';
 import {repoRoot,profilePrefix,evidenceRoot,ownerFlag} from './paths.mjs';
 export {repoRoot,profilePrefix,evidenceRoot};
 
-export async function withApp(name,{seed}={},journey){
+export async function withApp(name,{seed,secure}={},journey){
  const profile=await mkdtemp(profilePrefix);
  const evidence=path.join(evidenceRoot,`${name}-${new Date().toISOString().replace(/[:.]/g,'-')}`);
  await mkdir(evidence,{recursive:true});
@@ -16,6 +16,7 @@ export async function withApp(name,{seed}={},journey){
   const options=await fixtureOptions({directory:profile,projectDir:repoRoot,executablePath:process.env.GRATIS_TEST_APP});
   if(process.env.VERIFY_HIDDEN!=='1')delete options.env.GRATIS_TEST_HIDDEN;
   options.args.push(ownerFlag(profile));
+  if(secure)await seedSecure(options,profile,secure);
   app=await electron.launch(options);
   const page=await app.firstWindow();
   page.on('pageerror',e=>rendererErrors.push(e.message));
@@ -44,4 +45,17 @@ export async function withApp(name,{seed}={},journey){
   await app?.close().catch(()=>{});
   await rm(profile,{recursive:true,force:true});
  }
+}
+
+// Encrypted files can only be written by the app's own keychain-backed encryptor, so launch once,
+// encrypt with it (mock keychain, temp profile), and let the real run read the file back at startup.
+async function seedSecure(options,profile,files){
+ const boot=await electron.launch(options);
+ try{
+  await (await boot.firstWindow()).locator('#home-bots button:visible, #create-first-bot:visible, #prompt:visible').first().waitFor();
+  for(const [file,value] of Object.entries(files)){
+   const bytes=await boot.evaluate(async({safeStorage},text)=>{await safeStorage.isAsyncEncryptionAvailable();return Buffer.from(await safeStorage.encryptStringAsync(text)).toString('base64');},JSON.stringify(value));
+   await writeFile(path.join(profile,file),Buffer.from(bytes,'base64'));
+  }
+ }finally{await boot.close().catch(()=>{});}
 }

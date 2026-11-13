@@ -9,6 +9,12 @@ const seeds={
  'create-first-bot':()=>({version:1,bots:[],conversations:[],activeBotId:null,activeConversationId:null,settings:{...DEFAULT_SETTINGS}}),
 };
 
+// Seeded app connections carry a fake token and a .invalid address. The demo provider never builds an app runtime, so nothing contacts them.
+const fakeApp=(id,name)=>({id,name,url:`https://${id}.invalid/mcp`,tokens:{access_token:'verify-fake-token'}});
+const secures={
+ 'bot-apps':()=>({'direct-apps.secure':{apps:{custom_verify_notes:fakeApp('custom_verify_notes','Verify Notes'),custom_verify_mail:fakeApp('custom_verify_mail','Verify Mail')}}}),
+};
+
 const journeys={
  async chat({page,capture,step,workspace}){
   const text=`verify ping ${Date.now()}`;
@@ -65,6 +71,53 @@ const journeys={
   assert.ok(await page.getByText(name,{exact:true}).first().isVisible(),'bot visible');
   return {name,botCount:bots.length};
  },
+ async 'bot-apps'({page,capture,step,workspace}){
+  await openChat(page);
+  const bot=async()=>(await page.evaluate(()=>window.orbit.snapshot())).bots[0];
+  const open=async()=>{await page.locator('#edit-bot').click();await page.locator('#bot-dialog').waitFor({state:'visible'});await page.locator('#bot-apps input').first().waitFor();};
+  const row=name=>page.locator('#bot-apps label',{hasText:name}).locator('input');
+  const save=async()=>{await page.locator('#save-bot').click();await page.locator('#bot-dialog').waitFor({state:'hidden'});};
+  await open();
+  assert.deepEqual(await page.locator('#bot-apps label').allInnerTexts(),['Verify Notes','Verify Mail'],'each connected app listed by name');
+  assert.ok(await row('Verify Notes').isChecked()&&await row('Verify Mail').isChecked(),'every app starts checked when the bot has no selection');
+  assert.ok(!('apps' in await bot()),'bot starts without an apps field');
+  await page.locator('#bot-connections').scrollIntoViewIfNeeded();
+  await capture('all-apps-checked');
+  await row('Verify Mail').uncheck();
+  await page.locator('#bot-connections').scrollIntoViewIfNeeded();
+  await capture('mail-unchecked');
+  await save();step('saved one app');
+  assert.deepEqual((await bot()).apps,['custom_verify_notes'],'snapshot holds only the chosen app');
+  assert.deepEqual((await workspace()).bots[0].apps,['custom_verify_notes'],'selection persisted to workspace.json');
+  await open();
+  assert.ok(await row('Verify Notes').isChecked()&&!await row('Verify Mail').isChecked(),'choice survives reopening the dialog');
+  await page.locator('#bot-connections').scrollIntoViewIfNeeded();
+  await capture('choice-persisted');
+  await page.locator('#bot-connections').uncheck();
+  assert.ok(await page.locator('#bot-apps').isHidden(),'list hidden when Connected apps is off');
+  await page.locator('#bot-connections').scrollIntoViewIfNeeded();
+  await capture('connections-off');
+  await page.locator('#bot-connections').check();
+  assert.ok(await page.locator('#bot-apps').isVisible()&&!await row('Verify Mail').isChecked(),'list returns with the choice intact');
+  await row('Verify Mail').check();
+  await save();step('saved every app');
+  assert.ok(!('apps' in await bot()),'choosing every connected app stores no field');
+  assert.ok(!('apps' in (await workspace()).bots[0]),'workspace.json holds no apps field');
+  assert.equal((await bot()).capabilities?.connections,true,'master switch untouched');
+  return {saved:['custom_verify_notes','all']};
+ },
+ async 'bot-apps-empty'({page,capture,step,workspace}){
+  await openChat(page);
+  await page.locator('#edit-bot').click();await page.locator('#bot-dialog').waitFor({state:'visible'});
+  const note=page.locator('#bot-apps .field-note');await note.waitFor();
+  assert.match(await note.innerText(),/No apps connected.*Settings, Connections/,'empty state points to Settings, Connections');
+  assert.equal(await page.locator('#bot-apps input').count(),0,'no checkboxes without a connected app');
+  await page.locator('#bot-connections').scrollIntoViewIfNeeded();
+  await capture('no-apps-connected');
+  await page.locator('#save-bot').click();await page.locator('#bot-dialog').waitFor({state:'hidden'});
+  assert.ok(!('apps' in (await workspace()).bots[0]),'saving with nothing connected stores no selection');
+  return {empty:true};
+ },
  async 'create-first-bot'({page,capture,step,workspace}){
   const name=`First Bot ${Date.now()%100000}`;
   assert.equal((await workspace()).bots.length,0,'seeded profile starts with no bots');
@@ -93,7 +146,7 @@ async function openChat(page){
 const name=process.argv[2];
 if(!journeys[name]){console.error(`Usage: run.mjs <${Object.keys(journeys).join('|')}>`);process.exit(2);}
 try{
- const {evidence}=await withApp(name,{seed:seeds[name]?.()},journeys[name]);
+ const {evidence}=await withApp(name,{seed:seeds[name]?.(),secure:secures[name]?.()},journeys[name]);
  console.log(`PASS ${name}\nevidence: ${evidence}`);
 }catch(error){
  console.error(`FAIL ${name}: ${error.message}\nevidence: ${error.evidence??'(none)'}`);

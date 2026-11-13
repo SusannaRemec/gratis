@@ -1,6 +1,7 @@
 export const IMPORT_LIMITS={chars:60000,items:200,itemChars:1000};
 const CONTROL=/[^\P{Cc}\t\n\r]|[\u202a-\u202e\u2066-\u2069]/gu,MARKER=/^(?:[•‣◦▪·]\s*|(?:[-*+]|\d{1,3}[.)])\s+)/,PAIRS=[['"','"'],["'","'"],['“','”'],['‘','’'],['«','»'],['„','“'],['「','」']];
 export const importText=text=>String(text).replace(CONTROL,'').replace(/\s+/g,' ').trim();
+export const importedKey=key=>/^import_[0-9a-f]{16}$/.test(key);
 export const importKey=text=>importText(text).normalize('NFKC').toLowerCase();
 export const memoryLabel=content=>{const head=content.replace(/[.!?。！？:;,]+$/u,''),chars=[...head];if(chars.length<=50)return head;const cut=chars.slice(0,50).join(''),space=cut.lastIndexOf(' ');return(space>20?cut.slice(0,space):cut)+'…';};
 function unwrap(text){

@@ -111,7 +111,7 @@ test('a paused or unreachable memory refuses an import and stores nothing',async
 });
 test('pausing memory partway through an import stops it, and importing again finishes the rest',async t=>{
  const{s,memory}=await fixture(t);const c=await turn(s,'Hello there'),items=parseMemoryImport(pasted);
- const running=memory.importMemories(c.id,items);await memory.enable(false);await assert.rejects(running,/stopped/);assert.ok(memory.vault.state.facts.length<3);
+ const outcome=memory.importMemories(c.id,items).then(()=>null,error=>error);await memory.enable(false);assert.match((await outcome)?.message,/stopped/);assert.ok(memory.vault.state.facts.length<3);
  await memory.enable(true);const rest=await memory.importMemories(c.id,items);assert.equal(rest.added+rest.skipped,3);assert.equal((await memory.view(c.id)).profile.length,3);
 });
 test('an unknown conversation is refused even when every line would be skipped',async t=>{

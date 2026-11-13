@@ -2,6 +2,7 @@ import {join} from 'node:path';
 import {randomUUID,createHash} from 'node:crypto';
 import {MemoryVault,safeMemoryText,sensitiveMemory} from './memory-vault.mjs';
 import {extractMemory} from './memory-extract.mjs';
+import {IMPORT_LIMITS,importKey,importText,memoryLabel} from './memory-import.mjs';
 const normalized=s=>String(s).normalize('NFKC').replace(/\s+/g,' ').trim();
 const packetRows=rows=>rows.map(r=>({id:r.id,title:r.title,content:r.content,scope:r.scope,kind:r.kind||'fact',recordedAt:r.updatedAt,validFrom:r.validFrom,sources:r.sources?.map(s=>({conversationId:s.conversationId,messageId:s.messageId,quote:s.quote}))}));
 export class MemoryService{
@@ -31,6 +32,19 @@ export class MemoryService{
   const source=manual?{messageId:'manual-'+randomUUID(),conversationId:context.rootId,quote:input.content,at:this.now(),kind:'edited'}:this.source(origin.id,sourceMessage,input.quote);
   const date=value=>value?Date.parse(value):null,validFrom=date(input.validFrom)??source.at,expiresAt=date(input.expiresAt);
   const result=await this.vault.remember(context,{...input,scope,scopeId,source,validFrom,expiresAt},{manual,generation,allowRelearn:!manual&&/^(?:please\s+)?remember\b/i.test(this.messages(origin).findLast(m=>m.role==='user')?.content||'')});this.changed();void this.indexPending();return result;
+ }
+ async importMemories(conversationId,items){
+  this.ready();if(!this.vault.state.enabled)throw new Error('Memory is turned off. Turn it on to import.');
+  if(!Array.isArray(items)||items.length>IMPORT_LIMITS.items)throw new Error(`Import up to ${IMPORT_LIMITS.items} memories at a time.`);
+  const texts=items.map(item=>typeof item?.content==='string'?importText(item.content):'');
+  if(texts.some(text=>!text||text.length>IMPORT_LIMITS.itemChars))throw new Error(`Each memory needs 1 to ${IMPORT_LIMITS.itemChars} characters.`);
+  this.context(conversationId,{view:true});const known=new Set(this.vault.state.facts.filter(r=>r.scope==='profile').map(r=>importKey(r.content))),counts={added:0,skipped:0,withheld:0};
+  for(const content of texts){
+   const same=importKey(content);if(safeMemoryText(content)!==content){counts.withheld++;continue;}if(known.has(same)){counts.skipped++;continue;}
+   const result=await this.learn(conversationId,{key:'import_'+createHash('sha256').update(same).digest('hex').slice(0,16),title:memoryLabel(content),content,scope:'profile'},{manual:true});
+   if(result.status==='cancelled')throw new Error('This chat is being deleted.');known.add(same);counts[result.status==='confirmed'?'added':'skipped']++;
+  }
+  return counts;
  }
  async edit(conversationId,input){this.ready();const result=await this.vault.revise(this.context(conversationId,{view:true}),input);await this.invalidateSessionsFor([input.id]);this.changed();void this.indexPending();return result;}
  async confirm(conversationId,id){this.ready();const result=await this.vault.confirm(this.context(conversationId,{view:true}),id);this.changed();void this.indexPending();return result;}

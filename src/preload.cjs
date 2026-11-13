@@ -30,7 +30,7 @@ api.cancelTranscription = () => invoke('orbit:cancel-transcription');
 api.onVoiceProgress = cb => { const listener = (_e, value) => cb(value); ipcRenderer.on('orbit:voice-progress', listener); return () => ipcRenderer.removeListener('orbit:voice-progress', listener); };
 api.systemDark = () => invoke('orbit:theme');
 api.onState = cb => { const listener = (_e, value) => cb(value); ipcRenderer.on('orbit:state', listener); return () => ipcRenderer.removeListener('orbit:state', listener); };
-for(const name of ['view','search','add','edit','confirm','forget','retry','enable','export'])api['memory'+name[0].toUpperCase()+name.slice(1)]=value=>invoke('orbit:memory-'+name,value);
+for(const name of ['view','search','add','edit','confirm','forget','retry','enable','export','import'])api['memory'+name[0].toUpperCase()+name.slice(1)]=value=>invoke('orbit:memory-'+name,value);
 api.onMemoryChanged=cb=>{const listener=(_e,value)=>cb(value);ipcRenderer.on('orbit:memory-changed',listener);return()=>ipcRenderer.removeListener('orbit:memory-changed',listener);};
 api.onTheme = cb => { const listener = (_e, value) => cb(value); ipcRenderer.on('orbit:theme', listener); return () => ipcRenderer.removeListener('orbit:theme', listener); };
 api.onClosing = cb => { ipcRenderer.on('orbit:closing', cb); };

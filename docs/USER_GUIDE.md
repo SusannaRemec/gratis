@@ -10,6 +10,8 @@ Use the bot menu to edit, pin, duplicate or delete a bot. A group menu manages i
 
 Memory has three scopes: your profile across permitted bots, one bot across its chats, and one conversation. Open Memory to inspect, correct, confirm or forget entries. Permanent facts should come from what you actually said; uncertain inferences remain proposals. Retrieved memories are context, not authorization for external actions.
 
+To bring over what another assistant remembered about you, ask it to list those memories one per line, open Memory and choose Import. Paste the list and choose Review. Every line starts ticked and can be edited, so untick anything you do not want. Save adds the kept lines to your profile as memories you confirmed. Lines you already have are skipped, so importing the same list twice adds nothing, and lines that look like a password or key are left out. Import does not use an AI model and needs Memory to be turned on.
+
 ## Files and responses
 
 Attach files from the + menu. Generated files appear in Files. Markdown responses support headings, lists, tables, links and code blocks. Copy the full reply or an individual code block. PDF extraction additionally requires Poppler's `pdftotext` on PATH.

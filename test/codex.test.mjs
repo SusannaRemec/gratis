@@ -65,3 +65,14 @@ test('Codex reaches directly connected apps with their token, and writes still n
  const write=await client.callTool({name:'app_calendar__create_event',arguments:{title:'Lunch'}});assert.equal(write.isError,true);assert.deepEqual(asked,['mcp__app_calendar__create_event']);
  assert.deepEqual(calls,['list:today']);assert.ok(auth.length&&auth.every(h=>h==='Bearer app-token'));
 });
+test('Codex skips the approval prompt for a read-only Composio call',async t=>{
+ const {createServer}=await import('node:http'),{McpServer}=await import('@modelcontextprotocol/sdk/server/mcp.js'),{StreamableHTTPServerTransport}=await import('@modelcontextprotocol/sdk/server/streamableHttp.js');
+ const composio=createServer(async(req,res)=>{let body='';for await(const chunk of req)body+=chunk;const mcp=new McpServer({name:'fake',version:'1'});mcp.registerTool('COMPOSIO_MULTI_EXECUTE_TOOL',{description:'run',inputSchema:{}},async()=>({content:[{type:'text',text:'ran'}]}));const transport=new StreamableHTTPServerTransport({sessionIdGenerator:undefined});await mcp.connect(transport);await transport.handleRequest(req,res,JSON.parse(body));});
+ await new Promise(r=>composio.listen(0,'127.0.0.1',r));t.after(()=>{composio.closeAllConnections();composio.close();});
+ const asked=[],connections={status:()=>({composio:true}),mcp:async()=>({type:'http',url:`http://127.0.0.1:${composio.address().port}/mcp`}),isReadOnlyAction:async name=>/COMPOSIO_MULTI_EXECUTE_TOOL$/.test(name)};
+ const runtime=await agentRuntime({bot:{...bot,capabilities:{web:false,computer:false,files:false,connections:true}},conversationId:id,files:new WorkspaceFiles(await directory(t)),connections,onActivity:()=>{},approve:async name=>{asked.push(name);return false;},signal:new AbortController().signal});
+ const bridge=await createCodexBridge(runtime);t.after(()=>bridge.close());
+ const client=new Client({name:'test',version:'1'});await client.connect(new StreamableHTTPClientTransport(new URL(bridge.url),{requestInit:{headers:{Authorization:'Bearer '+bridge.token}}}));t.after(()=>client.close());
+ const result=await client.callTool({name:'composio_COMPOSIO_MULTI_EXECUTE_TOOL',arguments:{}});
+ assert.deepEqual(asked,[]);assert.equal(result.content[0].text,'ran');
+});

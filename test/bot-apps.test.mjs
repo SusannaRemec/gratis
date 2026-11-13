@@ -21,12 +21,15 @@ test('a selection narrows to connected apps; stale and unknown ids are ignored; 
   assert.deepEqual(allowedApps({apps:[]},['granola','gmail']),[]);
   assert.deepEqual(allowedApps({apps:['granola']},['granola','gmail','late']),['granola'],'an app connected after the choice stays off');
 });
-test('saving a selection that covers every connected app stores nothing; stale ids are dropped',()=>{
-  assert.equal(chosenApps(['granola','gmail'],['granola','gmail']),null);
-  assert.equal(chosenApps([],[]),null,'nothing connected means nothing to narrow');
-  assert.equal(chosenApps(['granola','gone'],['granola','gmail']).join(),'granola');
-  assert.deepEqual(chosenApps([],['granola']),[]);
-  assert.equal(chosenApps(['granola','gmail','gone'],['granola','gmail']),null,'stale ids do not make a partial selection');
+test('saving keeps a bot on all apps only when it was never narrowed; a narrowed bot never widens by itself',()=>{
+  assert.equal(chosenApps(['granola','gmail'],['granola','gmail'],undefined),null);
+  assert.equal(chosenApps([],[],undefined),null,'nothing connected and nothing narrowed stays on all apps');
+  assert.deepEqual(chosenApps(['granola'],['granola','gmail'],undefined),['granola']);
+  assert.deepEqual(chosenApps([],['granola'],undefined),[]);
+  assert.deepEqual(chosenApps(['granola','gone'],['granola','gmail'],['granola','gone']),['granola'],'stale ids are dropped');
+  assert.deepEqual(chosenApps([],[],[]),[],'a bot with no apps stays that way when nothing is connected');
+  assert.deepEqual(chosenApps(['granola'],['granola'],['granola']),['granola'],'an excluded app that is signed out now must not come back when it reconnects');
+  assert.deepEqual(chosenApps(['granola','gmail'],['granola','gmail'],['granola']),['granola','gmail'],'ticking everything on a narrowed bot stays an explicit list');
 });
 test('the bot dialog lists Composio when signed in and every direct app that holds a sign-in, by name',()=>{
   const direct=[{id:'granola',name:'Granola',state:'connected',signedIn:true,url:'u'},{id:'gmail',name:'Gmail',state:'disconnected',signedIn:false},{id:'custom_x',name:'X',state:'error',signedIn:true},{id:'custom_y',name:'Y',state:'error',signedIn:false},{id:'google_calendar',name:'Google Calendar',state:'authorizing',signedIn:true}];

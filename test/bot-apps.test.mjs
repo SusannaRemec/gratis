@@ -28,7 +28,7 @@ test('saving a selection that covers every connected app stores nothing; stale i
   assert.deepEqual(chosenApps([],['granola']),[]);
   assert.equal(chosenApps(['granola','gmail','gone'],['granola','gmail']),null,'stale ids do not make a partial selection');
 });
-test('the bot dialog lists Composio when signed in and only fully connected direct apps, by name',()=>{
+test('the bot dialog lists Composio when signed in and every direct app that holds a sign-in, by name',()=>{
   const direct=[{id:'granola',name:'Granola',state:'connected',signedIn:true,url:'u'},{id:'gmail',name:'Gmail',state:'disconnected',signedIn:false},{id:'custom_x',name:'X',state:'error',signedIn:true},{id:'custom_y',name:'Y',state:'error',signedIn:false},{id:'google_calendar',name:'Google Calendar',state:'authorizing',signedIn:true}];
   const listed=[{id:'granola',name:'Granola'},{id:'custom_x',name:'X'},{id:'google_calendar',name:'Google Calendar'}];
   assert.deepEqual(connectedApps(true,direct),[{id:COMPOSIO_APP,name:'Composio'},...listed],'an app that still holds a sign-in stays listed while it errors or re-authorizes, so saving cannot silently re-allow it');

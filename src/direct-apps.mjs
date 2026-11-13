@@ -42,7 +42,7 @@ export class DirectApps {
   save(){const value=JSON.stringify(this.data);const write=async()=>{await mkdir(this.directory,{recursive:true,mode:0o700});const tmp=join(this.directory,'.direct-apps-'+randomUUID());await writeFile(tmp,await this.encrypt(value),{mode:0o600});await rename(tmp,join(this.directory,'direct-apps.secure'));};this.persist=this.persist.then(write,write);return this.persist;}
   app(id){const app=typeof id==='string'&&Object.hasOwn(this.data.apps,id)?this.data.apps[id]:null;if(!app)throw new Error('Choose an app from the list.');return app;}
   status(){
-    return {googleClient:!!this.data.google?.clientId,googleRedirect:GOOGLE_REDIRECT.replace(GOOGLE_PORT,this.googlePort),apps:Object.values(this.data.apps).map(a=>({id:a.id,name:a.name,url:a.url,note:a.note||'',custom:!PRESETS[a.id],google:!!a.google,
+    return {googleClient:!!this.data.google?.clientId,googleRedirect:GOOGLE_REDIRECT.replace(GOOGLE_PORT,this.googlePort),apps:Object.values(this.data.apps).map(a=>({id:a.id,name:a.name,url:a.url,note:a.note||'',custom:!PRESETS[a.id],google:!!a.google,signedIn:!!a.tokens?.access_token,
       state:this.job?.id===a.id?'authorizing':this.errors[a.id]?'error':a.tokens?.access_token?'connected':'disconnected',error:this.errors[a.id]||''}))};
   }
   changed(){try{this.onChange(this.status());}catch{}}
